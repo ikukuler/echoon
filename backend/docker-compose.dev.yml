@@ -1,0 +1,82 @@
+services:
+  # Redis для разработки
+  redis:
+    image: redis:7-alpine
+    container_name: echowall-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    networks:
+      - echowall-dev-network
+
+  # EchoWall Backend для разработки (с hot reload)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: development
+    container_name: echowall-backend-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+      - "9229:9229" # Node.js debugger port
+    environment:
+      # Server Configuration
+      - PORT=3000
+      - NODE_ENV=development
+
+      # Redis Configuration
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+      # Firebase Configuration (заполните своими данными)
+      - FIREBASE_CREDENTIALS=${FIREBASE_CREDENTIALS}
+
+      # Supabase Configuration (заполните своими данными)
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      # Монтируем исходный код для hot reload
+      - .:/app
+      - /app/node_modules
+      - /app/dist
+    networks:
+      - echowall-dev-network
+    stdin_open: true
+    tty: true
+
+  # Redis Commander для удобного просмотра Redis данных
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: echowall-redis-commander
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+    networks:
+      - echowall-dev-network
+
+# Volumes для разработки
+volumes:
+  redis_dev_data:
+    driver: local
+
+# Development network
+networks:
+  echowall-dev-network:
+    driver: bridge
