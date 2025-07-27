@@ -1,0 +1,81 @@
+services:
+  # Redis для BullMQ очередей
+  redis:
+    image: redis:7-alpine
+    container_name: echowall-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - echowall-network
+
+  # EchoWall Backend приложение
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: echowall-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Server Configuration
+      - PORT=3000
+      - NODE_ENV=production
+
+      # Redis Configuration (подключение к Redis контейнеру)
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      # - REDIS_PASSWORD=your-redis-password  # Раскомментируйте при необходимости
+
+      # Firebase Configuration (заполните своими данными)
+      - FIREBASE_CREDENTIALS=${FIREBASE_CREDENTIALS}
+
+      # Supabase Configuration (заполните своими данными)
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/health",
+          "||",
+          "exit",
+          "1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    networks:
+      - echowall-network
+    volumes:
+      # Опционально: монтируем логи для отладки
+      - ./logs:/app/logs
+
+# Volumes для персистентного хранения данных Redis
+volumes:
+  redis_data:
+    driver: local
+
+# Изолированная сеть для сервисов
+networks:
+  echowall-network:
+    driver: bridge

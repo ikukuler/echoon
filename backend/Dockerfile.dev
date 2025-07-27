@@ -1,0 +1,31 @@
+# Development Dockerfile с hot reload для EchoWall Backend
+FROM node:18-alpine AS development
+
+# Устанавливаем глобальные инструменты для разработки
+RUN npm install -g tsx nodemon
+
+# Создаем рабочую директорию
+WORKDIR /app
+
+# Копируем package.json и package-lock.json
+COPY package*.json ./
+
+# Устанавливаем все зависимости (включая dev dependencies)
+RUN npm ci
+
+# Копируем TypeScript конфигурацию
+COPY tsconfig.json ./
+
+# Копируем исходный код
+COPY src/ ./src/
+COPY database.sql ./
+
+# Открываем порты
+EXPOSE 3000 9229
+
+# Health check для разработки
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+# Запускаем в режиме разработки с hot reload
+CMD ["npm", "run", "dev"] 
