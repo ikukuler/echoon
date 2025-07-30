@@ -57,19 +57,13 @@ export interface NotificationLog {
 }
 
 // Enums
-export type EchoPartType =
-  | "text"
-  | "image"
-  | "audio"
-  | "video"
-  | "link"
-  | "location";
+export type EchoPartType = "text" | "image" | "audio" | "link";
 export type DeviceType = "ios" | "android" | "web" | "unknown";
 export type NotificationStatus = "sent" | "failed" | "pending";
 
 // API Request/Response types
 export interface CreateEchoRequest {
-  return_at: string;
+  return_at?: string; // Опциональное поле - если не предоставлено, генерируется случайная дата
   parts: Array<{
     type: EchoPartType;
     content: string;
