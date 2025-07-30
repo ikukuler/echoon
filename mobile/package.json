@@ -1,0 +1,46 @@
+{
+  "name": "echowall-mobile",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@expo/ngrok": "^4.1.3",
+    "@hugeicons/core-free-icons": "^1.0.16",
+    "@hugeicons/react-native": "^1.0.7",
+    "@react-native-async-storage/async-storage": "^1.24.0",
+    "@react-native-community/datetimepicker": "^8.4.2",
+    "@react-navigation/native": "^6.1.18",
+    "@react-navigation/native-stack": "^6.11.0",
+    "eas-cli": "^16.17.3",
+    "expo": "~53.0.0",
+    "expo-av": "~15.1.7",
+    "expo-dev-client": "~5.2.4",
+    "expo-device": "~7.1.4",
+    "expo-font": "~13.3.2",
+    "expo-image-picker": "^16.1.4",
+    "expo-media-library": "~17.1.7",
+    "expo-notifications": "~0.31.4",
+    "expo-status-bar": "~2.2.3",
+    "nativewind": "^4.1.23",
+    "postcss": "^8.5.6",
+    "react": "19.0.0",
+    "react-native": "0.79.5",
+    "react-native-reanimated": "~3.17.5",
+    "react-native-safe-area-context": "~5.4.0",
+    "react-native-screens": "~4.11.1",
+    "react-native-svg": "^15.12.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@types/react": "~19.0.10",
+    "autoprefixer": "^10.4.21",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.8.3"
+  },
+  "private": true
+}

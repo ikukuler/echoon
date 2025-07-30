@@ -56,9 +56,7 @@ describe("EchoWall Testing System", () => {
 
       expect(firstPart).toHaveProperty("type");
       expect(firstPart).toHaveProperty("content");
-      expect(["text", "image", "audio", "video", "link", "location"]).toContain(
-        firstPart.type,
-      );
+      expect(["text", "image", "audio", "link"]).toContain(firstPart.type);
     });
   });
 

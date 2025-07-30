@@ -1,12 +1,14 @@
 import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
+import multer from "multer";
 import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
 import { ExpressAdapter } from "@bull-board/express";
 import {
   supabase,
   testConnection as testSupabaseConnection,
+  uploadFileToStorage,
 } from "./supabaseClient";
 import { scheduleEchoNotification, queuePromise } from "./echoQueue";
 import {
@@ -43,6 +45,25 @@ import {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Настройка multer для обработки файлов в памяти
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Разрешаем только изображения и аудио
+    if (
+      file.mimetype.startsWith("image/") ||
+      file.mimetype.startsWith("audio/")
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only images and audio files are allowed"));
+    }
+  },
+});
 
 // Bull Board setup - асинхронная инициализация
 const serverAdapter = new ExpressAdapter();
@@ -204,6 +225,108 @@ app.get(
   },
 );
 
+// POST /api/auth/register-token - регистрация FCM токена
+app.post(
+  "/api/auth/register-token",
+  authenticateUser,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const authReq = req as AuthenticatedRequest;
+      const { fcmToken, deviceId, deviceType } = req.body;
+
+      if (!fcmToken) {
+        res.status(400).json({
+          error: "FCM token is required",
+          code: "MISSING_FCM_TOKEN",
+        });
+        return;
+      }
+
+      // Проверяем, существует ли уже токен для этого устройства
+      const { data: existingToken } = await supabase
+        .from("user_tokens")
+        .select("id, is_active")
+        .eq("user_id", authReq.user!.userId)
+        .eq("fcm_token", fcmToken)
+        .single();
+
+      console.log("existingToken", existingToken);
+
+      if (existingToken) {
+        // Обновляем существующий токен
+        const { error: updateError } = await supabase
+          .from("user_tokens")
+          .update({
+            is_active: true,
+            updated_at: new Date().toISOString(),
+            device_id: deviceId || null,
+            device_type: deviceType || "unknown",
+          })
+          .eq("id", existingToken.id);
+
+        if (updateError) {
+          console.error("Error updating FCM token:", updateError);
+          res.status(500).json({
+            error: "Failed to update FCM token",
+            code: "TOKEN_UPDATE_FAILED",
+          });
+          return;
+        }
+
+        res.json({
+          message: "FCM token updated successfully",
+          token: {
+            id: existingToken.id,
+            deviceId: deviceId || null,
+            deviceType: deviceType || "unknown",
+            isActive: true,
+          },
+        });
+      } else {
+        // Создаем новый токен
+        const { data: newToken, error: insertError } = await supabase
+          .from("user_tokens")
+          .insert({
+            user_id: authReq.user!.userId,
+            fcm_token: fcmToken,
+            device_id: deviceId || null,
+            device_type: deviceType || "unknown",
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("Error inserting FCM token:", insertError);
+          res.status(500).json({
+            error: "Failed to register FCM token",
+            code: "TOKEN_INSERT_FAILED",
+          });
+          return;
+        }
+
+        res.status(201).json({
+          message: "FCM token registered successfully",
+          token: {
+            id: newToken.id,
+            deviceId: deviceId || null,
+            deviceType: deviceType || "unknown",
+            isActive: true,
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Register token error:", error);
+      res.status(500).json({
+        error: "Internal server error",
+        code: "INTERNAL_ERROR",
+      });
+    }
+  },
+);
+
 // Helper function to schedule delayed job using BullMQ
 async function scheduleDelayedJob(
   echoId: string,
@@ -227,6 +350,22 @@ function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+// Функция генерации случайной даты возврата (не более года от текущего момента)
+function generateRandomReturnDate(): string {
+  const now = new Date();
+  const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+
+  // Генерируем случайную дату между сейчас и годом вперед
+  const randomTime =
+    now.getTime() + Math.random() * (oneYearFromNow.getTime() - now.getTime());
+  const randomDate = new Date(randomTime);
+
+  // Округляем до минут (убираем секунды и миллисекунды)
+  randomDate.setSeconds(0, 0);
+
+  return randomDate.toISOString();
+}
+
 // POST /api/echoes endpoint (protected + rate limited)
 app.post(
   "/api/echoes",
@@ -244,15 +383,14 @@ app.post(
       const { return_at: returnAt, parts }: CreateEchoRequest = req.body;
       const userId = authReq.user!.userId; // Берем userId из middleware аутентификации
 
-      // Детальная валидация входных данных
-      if (!returnAt) {
-        console.log(`[${requestId}] Validation error: returnAt is required`);
-        res.status(400).json({
-          error: "Missing required field: returnAt",
-          code: "MISSING_RETURN_AT",
-        } satisfies ApiError);
-        return;
-      }
+      // Определяем дату возврата: если не предоставлена, генерируем случайную
+      const finalReturnAt = returnAt || generateRandomReturnDate();
+
+      console.log(
+        `[${requestId}] Return date: ${
+          returnAt ? "user-provided" : "auto-generated"
+        } - ${finalReturnAt}`,
+      );
 
       if (!Array.isArray(parts) || parts.length === 0) {
         console.log(
@@ -302,14 +440,7 @@ app.post(
         }
 
         // Валидация допустимых типов
-        const allowedTypes: EchoPartType[] = [
-          "text",
-          "image",
-          "audio",
-          "video",
-          "link",
-          "location",
-        ];
+        const allowedTypes: EchoPartType[] = ["text", "image", "audio", "link"];
         if (!allowedTypes.includes(part.type as EchoPartType)) {
           console.log(
             `[${requestId}] Validation error: part[${i}].type invalid - ${part.type}`,
@@ -324,8 +455,8 @@ app.post(
         }
       }
 
-      // Проверяем, что returnAt - валидная дата в будущем
-      const returnDate = new Date(returnAt);
+      // Проверяем, что finalReturnAt - валидная дата в будущем
+      const returnDate = new Date(finalReturnAt);
       if (isNaN(returnDate.getTime())) {
         console.log(
           `[${requestId}] Validation error: returnAt invalid date format`,
@@ -359,7 +490,7 @@ app.post(
           .from("echoes")
           .insert({
             user_id: userId,
-            return_at: returnAt,
+            return_at: finalReturnAt,
             created_at: new Date().toISOString(),
           })
           .select()
@@ -369,7 +500,7 @@ app.post(
           console.error(`[${requestId}] Database error creating echo:`, {
             error: echoError,
             userId,
-            returnAt,
+            finalReturnAt,
           });
           res.status(500).json({
             error: "Failed to create echo",
@@ -437,8 +568,10 @@ app.post(
         );
 
         // Ставим отложенное задание в очередь BullMQ
-        console.log(`[${requestId}] Scheduling delayed job for ${returnAt}`);
-        await scheduleDelayedJob(createdEcho.id, userId, returnAt);
+        console.log(
+          `[${requestId}] Scheduling delayed job for ${finalReturnAt}`,
+        );
+        await scheduleDelayedJob(createdEcho.id, userId, finalReturnAt);
 
         console.log(`[${requestId}] Echo creation completed successfully`);
 
@@ -489,6 +622,51 @@ app.post(
         code: "INTERNAL_ERROR",
         requestId,
       } satisfies ApiError);
+    }
+  },
+);
+
+// GET /api/echoes/:echoId - получить конкретное эхо по ID
+app.get(
+  "/api/echoes/:echoId",
+  readLimiter,
+  authenticateUser,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const authReq = req as AuthenticatedRequest;
+      const userId = authReq.user!.userId;
+      const echoId = req.params.echoId;
+
+      const { data: echo, error: echoError } = await supabase
+        .from("echoes")
+        .select(
+          `
+          id,
+          user_id,
+          return_at,
+          created_at,
+          echo_parts (
+            id,
+            type,
+            content,
+            order_index
+          )
+        `,
+        )
+        .eq("id", echoId)
+        .eq("user_id", userId)
+        .single();
+
+      if (echoError) {
+        console.error("Error fetching echo:", echoError);
+        res.status(404).json({ error: "Echo not found" });
+        return;
+      }
+
+      res.json(echo);
+    } catch (error) {
+      console.error("Error in /api/echoes/:echoId:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   },
 );
@@ -793,6 +971,54 @@ app.get(
       res.status(500).json({
         error: "Internal server error",
         code: "INTERNAL_ERROR",
+      } satisfies ApiError);
+    }
+  },
+);
+
+// POST /api/upload - загрузка файлов в Supabase Storage
+app.post(
+  "/api/upload",
+  authenticateUser,
+  upload.single("file"),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      if (!req.file) {
+        res.status(400).json({
+          error: "No file uploaded",
+          code: "NO_FILE",
+        } satisfies ApiError);
+        return;
+      }
+
+      const userId = req.user!.userId;
+      const { originalname, mimetype, buffer } = req.file;
+
+      console.log(
+        `📤 Uploading file: ${originalname} (${mimetype}) for user: ${userId}`,
+      );
+
+      // Загружаем файл в Supabase Storage
+      const result = await uploadFileToStorage(
+        buffer,
+        originalname,
+        mimetype,
+        userId,
+      );
+
+      res.json({
+        success: true,
+        data: {
+          url: result.url,
+          path: result.path,
+          fileName: originalname,
+        },
+      });
+    } catch (error: unknown) {
+      console.error("File upload error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Upload failed",
+        code: "UPLOAD_FAILED",
       } satisfies ApiError);
     }
   },

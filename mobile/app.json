@@ -1,0 +1,81 @@
+{
+  "expo": {
+    "name": "EchoWall",
+    "slug": "echowave",
+    "version": "1.0.0",
+    "extra": {
+      "expoProjectId": "d6ce95a5-5ba7-4877-8ecd-85bff8135343",
+      "eas": {
+        "projectId": "d6ce95a5-5ba7-4877-8ecd-85bff8135343"
+      }
+    },
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select images and audio files for your echoes.",
+        "NSMicrophoneUsageDescription": "This app needs access to your microphone to record audio for your echoes."
+      },
+      "bundleIdentifier": "com.ikukuler.echowave"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
+      "package": "com.ikukuler.echowave",
+      "googleServicesFile": "./google-services.json"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "scheme": "echowave",
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#ffffff"
+        }
+      ],
+      "expo-font"
+    ],
+    "fonts": [
+      {
+        "asset": "./assets/fonts/PlayfairDisplay-Regular.ttf",
+        "family": "PlayfairDisplay-Regular"
+      },
+      {
+        "asset": "./assets/fonts/PlayfairDisplay-Regular.ttf",
+        "family": "PlayfairDisplay-Bold"
+      },
+      {
+        "asset": "./assets/fonts/Nunito-Regular.ttf",
+        "family": "Nunito-Regular"
+      },
+      {
+        "asset": "./assets/fonts/Nunito-Medium.ttf",
+        "family": "Nunito-Medium"
+      },
+      {
+        "asset": "./assets/fonts/Nunito-SemiBold.ttf",
+        "family": "Nunito-SemiBold"
+      },
+      {
+        "asset": "./assets/fonts/Nunito-Bold.ttf",
+        "family": "Nunito-Bold"
+      }
+    ],
+    "owner": "ikukuler"
+  }
+}

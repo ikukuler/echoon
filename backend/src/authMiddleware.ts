@@ -16,8 +16,14 @@ export const authenticateUser = async (
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
+    console.log("🔐 Auth middleware - URL:", req.url);
+    console.log(
+      "🔐 Auth middleware - Authorization header:",
+      authHeader ? "present" : "missing",
+    );
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.log("❌ Auth middleware - Invalid authorization header");
       res.status(401).json({
         error: "Missing or invalid Authorization header",
         code: "MISSING_AUTH_TOKEN",

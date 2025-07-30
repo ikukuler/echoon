@@ -162,6 +162,31 @@ CREATE TRIGGER update_echoes_updated_at BEFORE UPDATE ON echoes
 CREATE TRIGGER update_user_tokens_updated_at BEFORE UPDATE ON user_tokens
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- Storage bucket for echo attachments
+-- Note: This needs to be created manually in Supabase Dashboard
+-- or via Supabase CLI if you have it configured
+-- 
+-- To create the bucket manually:
+-- 1. Go to Supabase Dashboard > Storage
+-- 2. Click "Create a new bucket"
+-- 3. Name: media
+-- 4. Public bucket: Yes (for public access to files)
+-- 5. File size limit: 10MB
+-- 6. Allowed MIME types: image/*, audio/*
+--
+-- Or via SQL (if you have the right permissions):
+-- INSERT INTO storage.buckets (id, name, public) 
+-- VALUES ('media', 'media', true);
+--
+-- CREATE POLICY "Public access to echo attachments" ON storage.objects
+-- FOR SELECT USING (bucket_id = 'media');
+--
+-- CREATE POLICY "Authenticated users can upload echo attachments" ON storage.objects
+-- FOR INSERT WITH CHECK (
+--   bucket_id = 'media' 
+--   AND auth.role() = 'authenticated'
+-- );
+
 -- Sample data (опционально)
 -- INSERT INTO users (email, password_hash, name) VALUES 
 -- ('test@example.com', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4tbQJhKz8O', 'Test User');

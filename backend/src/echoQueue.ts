@@ -18,13 +18,14 @@ const redisOptions: any = {
   host: process.env.REDIS_HOST || "localhost",
   port: parseInt(process.env.REDIS_PORT || "6379"),
   maxRetriesPerRequest: null, // BullMQ требует null
-  connectTimeout: 20000, // Увеличено для Docker
-  commandTimeout: 10000, // Увеличено для Docker
+  connectTimeout: 30000, // Увеличено для Docker
+  commandTimeout: 30000, // Увеличено для Docker
   lazyConnect: true, // Не подключаться до первой команды
+  keepAlive: 30000, // Keep-alive для стабильного соединения
   retryStrategy: (times: number) => {
-    const delay = Math.min(times * 100, 5000);
+    const delay = Math.min(times * 200, 10000);
     console.log(`🔄 Redis retry attempt ${times}, waiting ${delay}ms`);
-    return times > 10 ? null : delay; // Прекратить после 10 попыток
+    return times > 15 ? null : delay; // Прекратить после 15 попыток
   },
   reconnectOnError: (err: Error) => {
     console.log("🔌 Redis reconnecting due to error:", err.message);
@@ -182,13 +183,17 @@ async function sendPushNotification(
       data: {
         ...data,
         timestamp: new Date().toISOString(),
+        // Добавляем данные для навигации
+        echoId: data.echoId || "",
+        type: data.type || "",
+        partsCount: data.partsCount || "",
       },
       token: tokenInfo.token,
       android: {
         priority: "high" as const,
         notification: {
           sound: "default",
-          clickAction: "FLUTTER_NOTIFICATION_CLICK",
+          clickAction: "OPEN_ECHO_DETAIL",
         },
       },
       apns: {
@@ -281,12 +286,8 @@ function formatMessageFromParts(parts: EchoPart[]): string {
           return `[Изображение: ${part.content}]`;
         case "audio":
           return `[Аудио: ${part.content}]`;
-        case "video":
-          return `[Видео: ${part.content}]`;
         case "link":
           return `[Ссылка: ${part.content}]`;
-        case "location":
-          return `[Местоположение: ${part.content}]`;
         default:
           return part.content;
       }
