@@ -197,5 +197,14 @@ function getClientInfo(): ClientInfo | null {
 const client = initializeSupabaseClient();
 
 export const supabase = client;
-export const testConnection = testSupabaseConnection;
+export const testConnection = async () => {
+  console.log("🧪 TEST CONNECTION");
+  const supabaseOk = await testSupabaseConnection();
+  const clientInfo = getClientInfo();
+  console.log("🧪 CLIENT INFO", clientInfo);
+  return {
+    supabase: supabaseOk,
+    clientInfo: clientInfo,
+  };
+};
 export { getClientInfo, uploadFileToStorage };

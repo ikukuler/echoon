@@ -42,6 +42,7 @@ export const EchoDetailScreen: React.FC<EchoDetailScreenProps> = ({
   const [isImageModalVisible, setIsImageModalVisible] = useState(false);
   const [echo, setEcho] = useState<Echo | null>(route.params.echo || null);
   const [isLoading, setIsLoading] = useState(!route.params.echo);
+  const { user } = useAuth();
 
   // Загружаем эхо по ID, если он передан
   React.useEffect(() => {
@@ -50,7 +51,7 @@ export const EchoDetailScreen: React.FC<EchoDetailScreenProps> = ({
         try {
           setIsLoading(true);
           console.log("Loading echo with ID:", route.params.echoId);
-          
+
           const response = await apiService.getEcho(route.params.echoId!);
           if (response.success && response.data) {
             setEcho(response.data);
@@ -126,7 +127,6 @@ export const EchoDetailScreen: React.FC<EchoDetailScreenProps> = ({
       </View>
     );
   }
-  const { user } = useAuth();
 
   const openImageModal = (imageUrl: string) => {
     setSelectedImage(imageUrl);

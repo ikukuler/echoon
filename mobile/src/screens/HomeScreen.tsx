@@ -229,7 +229,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                         echo.id,
                       );
                       try {
-                        navigation.navigate("EchoDetail", { echo });
+                        navigation.navigate("EchoDetail", { echoId: echo.id });
                       } catch (error) {
                         console.error("Navigation error:", error);
                         Alert.alert("Error", "Failed to open echo details");

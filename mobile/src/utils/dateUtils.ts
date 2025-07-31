@@ -49,6 +49,7 @@ export const formatDate = (dateString: string): string => {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false, // 24-часовой формат
   });
 };
 
@@ -80,7 +81,7 @@ export const formatTime = (dateString: string): string => {
   return date.toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
-    hour12: true,
+    hour12: false, // 24-часовой формат
   });
 };
 
@@ -94,6 +95,25 @@ export const isFutureDate = (dateString: string): boolean => {
   if (!date) return false;
 
   return date > new Date();
+};
+
+/**
+ * Format date and time in 24-hour format
+ * @param dateString - Date string to format
+ * @returns Formatted date and time string or "Invalid date" if parsing fails
+ */
+export const formatDateTime24 = (dateString: string): string => {
+  const date = parseDate(dateString);
+  if (!date) return "Invalid date";
+
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false, // 24-часовой формат
+  });
 };
 
 /**
