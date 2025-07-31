@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Firebase конфигурация для push уведомлений
 // 🔍 Найти в: Firebase Console → Project Settings → General → Your apps → Web app
@@ -13,16 +13,16 @@ const firebaseConfig = {
 
 // Инициализация Firebase (только для push уведомлений)
 // Пока что оставляем пустым, так как авторизация теперь через JWT
-console.log('Firebase configured for push notifications only');
+console.log("Firebase configured for push notifications only");
 
 // Mock функция для получения токена (будет заменена на реальную FCM)
 export const getFCMToken = async (): Promise<string | null> => {
   try {
-    console.log('Getting FCM token...');
+    console.log("Getting FCM token...");
     // TODO: Реальная интеграция с FCM
-    return 'mock-fcm-token-' + Date.now();
+    return "mock-fcm-token-" + Date.now();
   } catch (error) {
-    console.error('Error getting FCM token:', error);
+    console.error("Error getting FCM token:", error);
     return null;
   }
 };

@@ -1,4 +1,4 @@
-# EchoWall 📱
+# EchoOn 📱
 
 **Send messages to your future self** - A React Native mobile app with Node.js backend for delayed message delivery.
 
@@ -16,7 +16,7 @@
 ## 🏗️ Architecture
 
 ```
-echowall/
+echoon/
 ├── backend/          # Node.js + Express API
 ├── mobile/           # React Native + Expo app
 └── docs/            # Documentation
@@ -53,7 +53,7 @@ echowall/
 ### 1. Clone Repository
 ```bash
 git clone <repository-url>
-cd echowall
+cd echoon
 ```
 
 ### 2. Backend Setup
@@ -206,10 +206,10 @@ FIREBASE_API_KEY=your_firebase_api_key
 ### Backend
 ```bash
 # Build Docker image
-docker build -t echowall-backend .
+docker build -t echoon-backend .
 
 # Run in production
-docker run -p 3000:3000 --env-file .env echowall-backend
+docker run -p 3000:3000 --env-file .env echoon-backend
 ```
 
 ### Mobile
@@ -236,7 +236,7 @@ MIT License - see LICENSE file for details
 
 ## 🆘 Support
 
-- 📧 Email: support@echowall.com
+- 📧 Email: support@echoon.com
 - 🐛 Issues: GitHub Issues
 - 📖 Docs: `/docs` directory
 

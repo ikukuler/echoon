@@ -1,9 +1,9 @@
-# Development Dockerfile для EchoWall Backend
+# Development Dockerfile для EchoOn Backend
 FROM node:18-alpine
 
 # Создаем non-root пользователя для безопасности
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S echowall -u 1001
+    adduser -S echoon -u 1001
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
@@ -18,8 +18,8 @@ RUN npm ci
 COPY . .
 
 # Изменяем владельца файлов на non-root пользователя
-RUN chown -R echowall:nodejs /app
-USER echowall
+RUN chown -R echoon:nodejs /app
+USER echoon
 
 # Открываем порт
 EXPOSE 3000

@@ -60,7 +60,7 @@ function initializeSupabaseClient(): SupabaseClient {
       // Дополнительные опции для серверной среды
       global: {
         headers: {
-          "x-application-name": "echowall-backend",
+          "x-application-name": "echoon-backend",
           // "x-role": "service_role",
           // Authorization: `Bearer ${serviceRoleKey}`,
         },

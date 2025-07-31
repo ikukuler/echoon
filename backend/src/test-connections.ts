@@ -8,7 +8,7 @@
 import "dotenv/config";
 
 async function testConnections(): Promise<void> {
-  console.log("🔧 Тестирование подключений EchoWall Backend\n");
+  console.log("🔧 Тестирование подключений EchoOn Backend\n");
 
   // Тестируем Firebase
   console.log("🔥 Тестирование Firebase Admin SDK...");
@@ -16,7 +16,9 @@ async function testConnections(): Promise<void> {
     const admin = await import("./firebase-admin-init");
     const app = admin.default;
     console.log(
-      `✅ Firebase: Успешно подключен к проекту "${app.options.projectId || 'unknown'}"`,
+      `✅ Firebase: Успешно подключен к проекту "${
+        app.options.projectId || "unknown"
+      }"`,
     );
   } catch (error: unknown) {
     console.log(

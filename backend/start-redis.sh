@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Скрипт для запуска Redis для EchoWall
+# Скрипт для запуска Redis для EchoOn
 # Использование: ./start-redis.sh
 
-echo "🔴 Redis Setup для EchoWall"
+echo "🔴 Redis Setup для EchoOn"
 echo "============================="
 
 # Функция проверки Redis
@@ -21,18 +21,18 @@ start_redis_docker() {
     echo "🐳 Запускаю Redis через Docker..."
     
     # Проверяем, не запущен ли уже контейнер
-    if docker ps --filter "name=echowall-redis-local" --format "{{.Names}}" | grep -q "echowall-redis-local"; then
+    if docker ps --filter "name=echoon-redis-local" --format "{{.Names}}" | grep -q "echoon-redis-local"; then
         echo "📦 Redis контейнер уже запущен"
         return 0
     fi
     
     # Останавливаем старый контейнер если есть
-    docker stop echowall-redis-local >/dev/null 2>&1
-    docker rm echowall-redis-local >/dev/null 2>&1
+    docker stop echoon-redis-local >/dev/null 2>&1
+docker rm echoon-redis-local >/dev/null 2>&1
     
     # Запускаем новый контейнер
     docker run -d \
-        --name echowall-redis-local \
+        --name echoon-redis-local \
         -p 6379:6379 \
         redis:7-alpine \
         redis-server --appendonly yes
@@ -104,9 +104,9 @@ if command -v docker &> /dev/null; then
     if start_redis_docker; then
         echo ""
         echo "🎛️  Redis запущен через Docker"
-        echo "   Контейнер: echowall-redis-local"
+        echo "   Контейнер: echoon-redis-local"
         echo "   Порт: 6379"
-        echo "   Остановка: docker stop echowall-redis-local"
+        echo "   Остановка: docker stop echoon-redis-local"
         exit 0
     fi
 fi
