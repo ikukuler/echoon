@@ -2,7 +2,7 @@ services:
   # Redis для BullMQ очередей
   redis:
     image: redis:7-alpine
-    container_name: echowall-redis-dev
+    container_name: echoon-redis-dev
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -15,15 +15,14 @@ services:
       timeout: 3s
       retries: 3
     networks:
-      - echowall-network
+      - echoon-network
 
-  # EchoWall Backend приложение (разработка)
+  # EchoOn Backend приложение (разработка)
   app:
     build:
       context: .
       dockerfile: Dockerfile.dev
-      target: development
-    container_name: echowall-backend-dev
+    container_name: echoon-backend-dev
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -56,7 +55,7 @@ services:
       - /app/node_modules
     command: npm run dev
     networks:
-      - echowall-network
+      - echoon-network
 
 # Volumes для персистентного хранения данных Redis
 volumes:
@@ -65,5 +64,5 @@ volumes:
 
 # Изолированная сеть для сервисов
 networks:
-  echowall-network:
+  echoon-network:
     driver: bridge

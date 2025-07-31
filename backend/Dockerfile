@@ -1,4 +1,4 @@
-# Multi-stage Docker build для EchoWall Backend
+# Multi-stage Docker build для EchoOn Backend
 # Stage 1: Build TypeScript приложения
 FROM node:18-alpine AS builder
 
@@ -25,7 +25,7 @@ FROM node:18-alpine AS production
 
 # Создаем non-root пользователя для безопасности
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S echowall -u 1001
+    adduser -S echoon -u 1001
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
@@ -43,8 +43,8 @@ COPY --from=builder /app/dist ./dist
 COPY database.sql ./
 
 # Изменяем владельца файлов на non-root пользователя
-RUN chown -R echowall:nodejs /app
-USER echowall
+RUN chown -R echoon:nodejs /app
+USER echoon
 
 # Открываем порт
 EXPOSE 3000

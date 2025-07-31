@@ -1,6 +1,6 @@
-# EchoWall Mobile App
+# EchoOn Mobile App
 
-React Native мобильное приложение для EchoWall с Firebase Google Auth и NativeWind.
+React Native мобильное приложение для EchoOn с Firebase Google Auth и NativeWind.
 
 ## 🚀 Установка и настройка
 

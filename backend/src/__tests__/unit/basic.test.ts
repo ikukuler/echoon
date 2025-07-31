@@ -9,7 +9,7 @@ import {
 } from "../utils/testHelpers";
 import { mockCreateEchoRequest } from "../utils/mockData";
 
-describe("EchoWall Testing System", () => {
+describe("EchoOn Testing System", () => {
   describe("Test Utilities", () => {
     test("should generate valid mock Firebase tokens", () => {
       const token = generateMockFirebaseToken();

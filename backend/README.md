@@ -1,6 +1,6 @@
-# EchoWall Backend
+# EchoOn Backend
 
-Минимальный backend на Node.js с Express для приложения EchoWall с поддержкой Firebase Admin SDK и Supabase.
+Минимальный backend на Node.js с Express для приложения EchoOn с поддержкой Firebase Admin SDK и Supabase.
 
 ## Возможности
 
@@ -603,8 +603,8 @@ dist/                      # Скомпилированный JavaScript
 npm run docker:up
 
 # Или ручная сборка
-docker build -t echowall-backend .
-docker run -p 3000:3000 --env-file .env echowall-backend
+docker build -t echoon-backend .
+docker run -p 3000:3000 --env-file .env echoon-backend
 ```
 
 ### Production готовые образы:
@@ -655,7 +655,7 @@ RateLimit-Reset: 1640995200
 
 ## 🧪 Тестирование
 
-EchoWall включает полнофункциональную систему тестирования с Jest и TypeScript:
+EchoOn включает полнофункциональную систему тестирования с Jest и TypeScript:
 
 ### Запуск тестов:
 ```bash

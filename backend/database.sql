@@ -1,4 +1,4 @@
--- EchoWall Database Schema
+-- EchoOn Database Schema
 -- Обновленная схема для email/password авторизации
 
 -- Enable UUID extension

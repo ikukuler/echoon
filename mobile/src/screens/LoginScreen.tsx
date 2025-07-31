@@ -96,7 +96,7 @@ export const LoginScreen: React.FC = () => {
             <Text className="text-white text-5xl font-bold">E</Text>
           </View>
           <Text className="text-3xl text-textDark mb-2 font-playfair-bold">
-            EchoWall
+            EchoOn
           </Text>
           <Text className="text-lg text-accentSecondary text-center leading-6 font-inter-semibold font-semibold">
             Send messages to your future self
@@ -179,8 +179,7 @@ export const LoginScreen: React.FC = () => {
 
         {/* Terms */}
         <Text className="text-accentSecondary text-sm text-center leading-5 font-inter-semibold font-semibold">
-          By using EchoWall, you agree to our Terms of Service and Privacy
-          Policy
+          By using EchoOn, you agree to our Terms of Service and Privacy Policy
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
