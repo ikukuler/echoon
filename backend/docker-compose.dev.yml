@@ -1,5 +1,5 @@
 services:
-  # Redis для разработки
+  # Redis для BullMQ очередей
   redis:
     image: redis:7-alpine
     container_name: echowall-redis-dev
@@ -7,17 +7,17 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_dev_data:/data
-    command: redis-server --appendonly yes
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --timeout 300 --tcp-keepalive 60
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 3s
       retries: 3
     networks:
-      - echowall-dev-network
+      - echowall-network
 
-  # EchoWall Backend для разработки (с hot reload)
+  # EchoWall Backend приложение (разработка)
   app:
     build:
       context: .
@@ -27,7 +27,6 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-      - "9229:9229" # Node.js debugger port
     environment:
       # Server Configuration
       - PORT=3000
@@ -37,10 +36,10 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
 
-      # Firebase Configuration (заполните своими данными)
+      # Firebase Configuration
       - FIREBASE_CREDENTIALS=${FIREBASE_CREDENTIALS}
 
-      # Supabase Configuration (заполните своими данными)
+      # Supabase Configuration
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
@@ -48,35 +47,23 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      # Монтируем исходный код для hot reload
-      - .:/app
+      # Монтируем исходный код для автоматического обновления
+      - ./src:/app/src
+      - ./package.json:/app/package.json
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./logs:/app/logs
+      # Исключаем node_modules из монтирования
       - /app/node_modules
-      - /app/dist
+    command: npm run dev
     networks:
-      - echowall-dev-network
-    stdin_open: true
-    tty: true
+      - echowall-network
 
-  # Redis Commander для удобного просмотра Redis данных
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: echowall-redis-commander
-    restart: unless-stopped
-    ports:
-      - "8081:8081"
-    environment:
-      - REDIS_HOSTS=local:redis:6379
-    depends_on:
-      - redis
-    networks:
-      - echowall-dev-network
-
-# Volumes для разработки
+# Volumes для персистентного хранения данных Redis
 volumes:
-  redis_dev_data:
+  redis_data:
     driver: local
 
-# Development network
+# Изолированная сеть для сервисов
 networks:
-  echowall-dev-network:
+  echowall-network:
     driver: bridge

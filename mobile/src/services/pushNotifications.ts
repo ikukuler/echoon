@@ -2,6 +2,7 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
 import { apiService } from "./api";
+import { authService } from "./authService";
 
 export interface PushNotificationData {
   echoId?: string;
@@ -114,42 +115,61 @@ class PushNotificationService {
 
     // Обработчик нажатия на уведомление
     const responseListener =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        console.log("🔔 Notification response received:", response);
-        console.log(
-          "📱 Response notification data:",
-          response.notification.request.content.data,
-        );
+      Notifications.addNotificationResponseReceivedListener(
+        async (response) => {
+          console.log("🔔 Notification response received:", response);
+          console.log(
+            "📱 Response notification data:",
+            response.notification.request.content.data,
+          );
 
-        const data = response.notification.request.content
-          .data as PushNotificationData;
+          const data = response.notification.request.content
+            .data as PushNotificationData;
 
-        console.log("📋 Parsed notification data:", data);
+          console.log("📋 Parsed notification data:", data);
 
-        // Если это уведомление об эхо, переходим к деталям
-        if (data.echoId && data.type === "echo_reminder") {
-          console.log("🎯 Navigating to echo details:", data.echoId);
+          // Если это уведомление об эхо, переходим к деталям
+          if (data.echoId && data.type === "echo_reminder") {
+            console.log("🎯 Navigating to echo details:", data.echoId);
 
-          // Переходим к EchoDetail с ID эхо
-          if (navigation && navigation.navigate) {
-            console.log("🚀 Calling navigation.navigate with:", {
-              echoId: data.echoId,
-              fromNotification: true,
-            });
-            navigation.navigate("EchoDetail", {
-              echoId: data.echoId,
-              fromNotification: true,
-            });
+            // Проверяем аутентификацию перед навигацией
+            try {
+              const token = await authService.getToken();
+              console.log("🔑 Auth token available:", !!token);
+
+              if (!token) {
+                console.log("❌ No auth token available, cannot load echo");
+                return;
+              }
+            } catch (error) {
+              console.log("❌ Auth error:", error);
+              return;
+            }
+
+            // Переходим к EchoDetail с ID эхо
+            if (navigation && navigation.navigate) {
+              console.log("🚀 Calling navigation.navigate with:", {
+                echoId: data.echoId,
+                fromNotification: true,
+              });
+              navigation.navigate("EchoDetail", {
+                echoId: data.echoId,
+                fromNotification: true,
+              });
+            } else {
+              console.log("❌ Navigation not available");
+            }
           } else {
-            console.log("❌ Navigation not available");
+            console.log(
+              "❌ Not an echo reminder notification or missing data:",
+              {
+                echoId: data.echoId,
+                type: data.type,
+              },
+            );
           }
-        } else {
-          console.log("❌ Not an echo reminder notification or missing data:", {
-            echoId: data.echoId,
-            type: data.type,
-          });
-        }
-      });
+        },
+      );
 
     return () => {
       Notifications.removeNotificationSubscription(notificationListener);

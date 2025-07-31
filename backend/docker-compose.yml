@@ -69,6 +69,9 @@ services:
     volumes:
       # Опционально: монтируем логи для отладки
       - ./logs:/app/logs
+      # Для разработки: монтируем исходный код (раскомментируйте для автоматического обновления)
+      # - ./src:/app/dist/src
+      # - ./package.json:/app/package.json
 
 # Volumes для персистентного хранения данных Redis
 volumes:

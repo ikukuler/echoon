@@ -626,50 +626,50 @@ app.post(
   },
 );
 
-// GET /api/echoes/:echoId - получить конкретное эхо по ID
-app.get(
-  "/api/echoes/:echoId",
-  readLimiter,
-  authenticateUser,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const authReq = req as AuthenticatedRequest;
-      const userId = authReq.user!.userId;
-      const echoId = req.params.echoId;
+// GET /api/user/echoes/:echoId - получить конкретное эхо по ID
+// app.get(
+//   "/api/user/echoes/:echoId",
+//   // readLimiter, // ВРЕМЕННО ОТКЛЮЧЕНО
+//   authenticateUser,
+//   async (req: Request, res: Response): Promise<void> => {
+//     try {
+//       const authReq = req as AuthenticatedRequest;
+//       const userId = authReq.user!.userId;
+//       const echoId = req.params.echoId;
 
-      const { data: echo, error: echoError } = await supabase
-        .from("echoes")
-        .select(
-          `
-          id,
-          user_id,
-          return_at,
-          created_at,
-          echo_parts (
-            id,
-            type,
-            content,
-            order_index
-          )
-        `,
-        )
-        .eq("id", echoId)
-        .eq("user_id", userId)
-        .single();
+//       const { data: echo, error: echoError } = await supabase
+//         .from("echoes")
+//         .select(
+//           `
+//           id,
+//           user_id,
+//           return_at,
+//           created_at,
+//           echo_parts (
+//             id,
+//             type,
+//             content,
+//             order_index
+//           )
+//         `,
+//         )
+//         .eq("id", echoId)
+//         .eq("user_id", userId)
+//         .single();
 
-      if (echoError) {
-        console.error("Error fetching echo:", echoError);
-        res.status(404).json({ error: "Echo not found" });
-        return;
-      }
+//       if (echoError) {
+//         console.error("Error fetching echo:", echoError);
+//         res.status(404).json({ error: "Echo not found" });
+//         return;
+//       }
 
-      res.json(echo);
-    } catch (error) {
-      console.error("Error in /api/echoes/:echoId:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  },
-);
+//       res.json(echo);
+//     } catch (error) {
+//       console.error("Error in /api/echoes/:echoId:", error);
+//       res.status(500).json({ error: "Internal server error" });
+//     }
+//   },
+// );
 
 // User profile endpoints
 
@@ -900,6 +900,67 @@ app.post(
   },
 );
 
+// GET /api/user/echoes/:echoId - получить конкретное эхо по ID
+app.get(
+  "/api/user/echoes/:echoId",
+  // readLimiter, // ВРЕМЕННО ОТКЛЮЧЕНО
+  authenticateUser,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const authReq = req as AuthenticatedRequest;
+      const userId = authReq.user!.userId;
+      const echoId = req.params.echoId;
+
+      const { data: echo, error: echoError } = await supabase
+        .from("echoes")
+        .select(
+          `
+          id,
+          user_id,
+          return_at,
+          created_at,
+          echo_parts (
+            id,
+            type,
+            content,
+            order_index
+          )
+        `,
+        )
+        .eq("id", echoId)
+        .eq("user_id", userId)
+        .single();
+
+      if (echoError) {
+        console.error("Error fetching echo:", echoError);
+        res.status(404).json({ error: "Echo not found" });
+        return;
+      }
+
+      // Преобразуем echo_parts в parts для совместимости с мобильным приложением
+      const formattedEcho = {
+        id: echo.id,
+        user_id: echo.user_id,
+        return_at: echo.return_at,
+        created_at: echo.created_at,
+        parts: (echo.echo_parts || [])
+          .sort((a: any, b: any) => a.order_index - b.order_index)
+          .map((part: any) => ({
+            id: part.id,
+            type: part.type,
+            content: part.content,
+            order_index: part.order_index,
+          })),
+      };
+
+      res.json(formattedEcho);
+    } catch (error) {
+      console.error("Error in /api/user/echoes/:echoId:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
 // GET /api/user/echoes - получить список echoes пользователя
 app.get(
   "/api/user/echoes",
@@ -1031,7 +1092,7 @@ app.get(
   async (req: Request, res: Response): Promise<void> => {
     try {
       // Тестируем подключение к Supabase
-      const supabaseOk = await testSupabaseConnection();
+      const supabaseConnection = await testSupabaseConnection();
 
       // Проверяем подключение к Redis/BullMQ
       let bullmqOk = false;
@@ -1051,7 +1112,9 @@ app.get(
         timestamp: new Date().toISOString(),
         services: {
           firebase: "initialized",
-          supabase: supabaseOk ? "connected" : "connection_failed",
+          supabase: supabaseConnection.supabase
+            ? `connected ${supabaseConnection.clientInfo?.url} ${supabaseConnection.clientInfo?.hasServiceRole}`
+            : "connection_failed",
           redis: bullmqOk ? "connected" : "connection_failed",
           queue: bullmqOk ? "active" : "inactive",
         },

@@ -29,7 +29,7 @@ class ApiService {
 
       if (token) {
         headers.Authorization = `Bearer ${token}`;
-        console.log("🔑 Using token:", token.substring(0, 20) + "...");
+        console.log("🔑 Using token:", token);
       } else {
         console.log("⚠️ No token available");
       }
@@ -156,7 +156,7 @@ class ApiService {
   }
 
   async getEcho(echoId: string): Promise<ApiResponse<Echo>> {
-    return this.makeRequest<Echo>(`/echoes/${echoId}`, {
+    return this.makeRequest<Echo>(`/user/echoes/${echoId}`, {
       method: "GET",
     });
   }
