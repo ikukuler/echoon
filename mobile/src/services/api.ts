@@ -144,11 +144,11 @@ class ApiService {
   }
 
   async getUserEchoes(
-    page = 1,
+    offset = 0,
     limit = 20,
   ): Promise<ApiResponse<GetEchoesResponse>> {
     return this.makeRequest<GetEchoesResponse>(
-      `/user/echoes?page=${page}&limit=${limit}`,
+      `/user/echoes?offset=${offset}&limit=${limit}`,
       {
         method: "GET",
       },
