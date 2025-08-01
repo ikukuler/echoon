@@ -15,7 +15,6 @@ import { apiService } from "../services/api";
 import { Echo } from "../types";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { formatDate, isFutureDate } from "../utils/dateUtils";
-import { useFocusEffect } from "@react-navigation/native";
 import { AudioPlayer } from "../components/AudioPlayer";
 import { pushNotificationService } from "../services/pushNotifications";
 import {
@@ -24,6 +23,8 @@ import {
   Link01Icon,
   CheckmarkCircle03Icon,
   Clock05Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react-native";
 
@@ -33,10 +34,18 @@ interface HomeScreenProps {
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { user } = useAuth();
+
   const [echoes, setEchoes] = useState<Echo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalEchoes, setTotalEchoes] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const limit = 10; // Количество эхов на страницу
 
   // Функция для проверки, есть ли у эхо изображения
   const hasImageAttachment = (echo: Echo): boolean => {
@@ -55,42 +64,107 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return textPart?.content || "";
   };
 
-  const loadEchoes = useCallback(async (isRefresh = false) => {
-    try {
-      console.log("Loading echoes...", { isRefresh });
-      if (isRefresh) setIsRefreshing(true);
-      else setIsLoading(true);
+  const loadEchoes = useCallback(
+    async (isRefresh = false, page = 0) => {
+      try {
+        console.log("Loading echoes...", { isRefresh, page });
+        if (isRefresh) setIsRefreshing(true);
+        else if (page === 0) setIsLoading(true);
+        else setIsLoadingMore(true);
 
-      const response = await apiService.getUserEchoes();
+        const offset = page * limit;
+        console.log("API call params:", { offset, limit });
+        const response = await apiService.getUserEchoes(offset, limit);
 
-      if (response.success && response.data) {
-        // API возвращает объект с полем 'echoes', а не сам массив
-        const newEchoes = response.data.echoes || [];
-        console.log("Loaded echoes:", newEchoes.length);
-        setEchoes(newEchoes);
-      } else {
-        Alert.alert("Error", response.error || "Failed to load echoes");
+        if (response.success && response.data) {
+          const newEchoes = response.data.echoes || [];
+          const pagination = response.data.pagination;
+
+          console.log(
+            "Loaded echoes:",
+            newEchoes.length,
+            "Total:",
+            pagination?.total,
+          );
+          console.log("Pagination info:", pagination);
+
+          if (isRefresh || page === 0) {
+            setEchoes(newEchoes);
+            setCurrentPage(0);
+            setTotalEchoes(pagination?.total || 0);
+            setHasMore(offset + limit < (pagination?.total || 0));
+          } else {
+            setEchoes((prev) => [...prev, ...newEchoes]);
+            setHasMore(offset + limit < (pagination?.total || 0));
+          }
+        } else {
+          console.error("API response error:", response.error);
+          Alert.alert("Error", response.error || "Failed to load echoes");
+        }
+      } catch (error) {
+        console.error("Error loading echoes:", error);
+        Alert.alert("Error", "Failed to load echoes");
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+        setIsLoadingMore(false);
       }
-    } catch (error) {
-      console.error("Error loading echoes:", error);
-      Alert.alert("Error", "Failed to load echoes");
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+    },
+    [limit],
+  );
+
+  // Функции для пагинации
+  const loadNextPage = useCallback(() => {
+    console.log("loadNextPage called:", {
+      hasMore,
+      isLoadingMore,
+      currentPage,
+    });
+    if (hasMore && !isLoadingMore) {
+      const nextPage = currentPage + 1;
+      console.log("Loading next page:", nextPage);
+      setCurrentPage(nextPage);
+      loadEchoes(false, nextPage);
     }
-  }, []);
+  }, [hasMore, isLoadingMore, currentPage, loadEchoes]);
+
+  const loadPreviousPage = useCallback(() => {
+    console.log("loadPreviousPage called:", { currentPage, isLoadingMore });
+    if (currentPage > 0 && !isLoadingMore) {
+      const prevPage = currentPage - 1;
+      console.log("Loading previous page:", prevPage);
+      setCurrentPage(prevPage);
+      loadEchoes(false, prevPage);
+    }
+  }, [currentPage, isLoadingMore, loadEchoes]);
+
+  const goToFirstPage = useCallback(() => {
+    console.log("goToFirstPage called:", { currentPage, isLoadingMore });
+    if (currentPage > 0 && !isLoadingMore) {
+      console.log("Going to first page");
+      setCurrentPage(0);
+      loadEchoes(false, 0);
+    }
+  }, [currentPage, isLoadingMore, loadEchoes]);
+
+  const goToLastPage = useCallback(() => {
+    const lastPage = Math.floor((totalEchoes - 1) / limit);
+    console.log("goToLastPage called:", {
+      currentPage,
+      lastPage,
+      totalEchoes,
+      isLoadingMore,
+    });
+    if (currentPage !== lastPage && !isLoadingMore) {
+      console.log("Going to last page:", lastPage);
+      setCurrentPage(lastPage);
+      loadEchoes(false, lastPage);
+    }
+  }, [currentPage, totalEchoes, limit, isLoadingMore, loadEchoes]);
 
   useEffect(() => {
-    loadEchoes();
+    loadEchoes(false, 0);
   }, [loadEchoes]);
-
-  // Обновляем список эхо при возврате на экран
-  useFocusEffect(
-    useCallback(() => {
-      console.log("HomeScreen focused - loading echoes...");
-      loadEchoes();
-    }, [loadEchoes]),
-  );
 
   if (isLoading) {
     return <LoadingSpinner text="Loading your echoes..." />;
@@ -120,6 +194,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Refresh Button */}
+        <TouchableOpacity
+          onPress={() => loadEchoes(true, 0)}
+          className="mt-3 py-2 px-4 rounded-lg bg-echo self-end"
+          disabled={isRefreshing}
+        >
+          <Text className="text-textDark font-medium">
+            {isRefreshing ? "Refreshing..." : "Refresh"}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Content */}
@@ -199,7 +284,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           {/* Echoes List */}
           <View>
             <Text className="text-3xl text-textDark mb-4 font-playfair-bold">
-              Your Echoes ({echoes.length})
+              Your Echoes ({totalEchoes})
             </Text>
 
             {echoes.length === 0 ? (
@@ -478,6 +563,143 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   </TouchableOpacity>
                 );
               })
+            )}
+
+            {/* Pagination Controls */}
+            {echoes.length > 0 && (
+              <View className="mt-8 mb-4">
+                {/* Page Info */}
+                <View className="flex-row justify-center items-center mb-4">
+                  <Text className="text-accentSecondary text-sm font-inter-bold">
+                    Page {currentPage + 1} of {Math.ceil(totalEchoes / limit)}
+                  </Text>
+                </View>
+
+                {/* Pagination Buttons */}
+                <View className="flex-row justify-center items-center gap-4">
+                  {/* First Page Button */}
+                  <TouchableOpacity
+                    onPress={goToFirstPage}
+                    disabled={currentPage === 0 || isLoadingMore}
+                    className={`px-4 py-3 rounded-xl flex-row items-center gap-2 ${
+                      currentPage === 0 || isLoadingMore
+                        ? "bg-gray-300 opacity-50"
+                        : "bg-echo shadow-sm"
+                    }`}
+                    activeOpacity={0.7}
+                  >
+                    <HugeiconsIcon
+                      icon={ArrowLeft01Icon}
+                      size={20}
+                      color={
+                        currentPage === 0 || isLoadingMore ? "#9CA3AF" : "#000"
+                      }
+                      strokeWidth={2}
+                    />
+                    <HugeiconsIcon
+                      icon={ArrowLeft01Icon}
+                      size={20}
+                      color={
+                        currentPage === 0 || isLoadingMore ? "#9CA3AF" : "#000"
+                      }
+                      strokeWidth={2}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Previous Page Button */}
+                  <TouchableOpacity
+                    onPress={loadPreviousPage}
+                    disabled={currentPage === 0 || isLoadingMore}
+                    className={`px-4 py-3 rounded-xl flex-row items-center gap-2 ${
+                      currentPage === 0 || isLoadingMore
+                        ? "bg-gray-300 opacity-50"
+                        : "bg-echo shadow-sm"
+                    }`}
+                    activeOpacity={0.7}
+                  >
+                    <HugeiconsIcon
+                      icon={ArrowLeft01Icon}
+                      size={20}
+                      color={
+                        currentPage === 0 || isLoadingMore ? "#9CA3AF" : "#000"
+                      }
+                      strokeWidth={2}
+                    />
+                    <Text
+                      className={`font-inter-bold ${
+                        currentPage === 0 || isLoadingMore
+                          ? "text-gray-500"
+                          : "text-black"
+                      }`}
+                    >
+                      Previous
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Next Page Button */}
+                  <TouchableOpacity
+                    onPress={loadNextPage}
+                    disabled={!hasMore || isLoadingMore}
+                    className={`px-4 py-3 rounded-xl flex-row items-center gap-2 ${
+                      !hasMore || isLoadingMore
+                        ? "bg-gray-300 opacity-50"
+                        : "bg-echo shadow-sm"
+                    }`}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      className={`font-inter-bold ${
+                        !hasMore || isLoadingMore
+                          ? "text-gray-500"
+                          : "text-black"
+                      }`}
+                    >
+                      Next
+                    </Text>
+                    <HugeiconsIcon
+                      icon={ArrowRight01Icon}
+                      size={20}
+                      color={!hasMore || isLoadingMore ? "#9CA3AF" : "#000"}
+                      strokeWidth={2}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Last Page Button */}
+                  <TouchableOpacity
+                    onPress={goToLastPage}
+                    disabled={!hasMore || isLoadingMore}
+                    className={`px-4 py-3 rounded-xl flex-row items-center gap-2 ${
+                      !hasMore || isLoadingMore
+                        ? "bg-gray-300 opacity-50"
+                        : "bg-echo shadow-sm"
+                    }`}
+                    activeOpacity={0.7}
+                  >
+                    <HugeiconsIcon
+                      icon={ArrowRight01Icon}
+                      size={20}
+                      color={!hasMore || isLoadingMore ? "#9CA3AF" : "#000"}
+                      strokeWidth={2}
+                    />
+                    <HugeiconsIcon
+                      icon={ArrowRight01Icon}
+                      size={20}
+                      color={!hasMore || isLoadingMore ? "#9CA3AF" : "#000"}
+                      strokeWidth={2}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Loading More Indicator */}
+                {isLoadingMore && (
+                  <View className="flex-row justify-center items-center mt-4">
+                    <ActivityIndicator size="small" color="#0EA5E9" />
+                    <Text className="text-accentSecondary text-sm ml-2 font-inter-bold">
+                      Loading more echoes...
+                    </Text>
+                  </View>
+                )}
+              </View>
             )}
           </View>
         </View>

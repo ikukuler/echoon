@@ -975,6 +975,21 @@ app.get(
       const limitNum = parseInt(limit);
       const offsetNum = parseInt(offset);
 
+      // Получаем общее количество эхов для пагинации
+      const { count: totalCount, error: countError } = await supabase
+        .from("echoes")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId);
+
+      if (countError) {
+        console.error("Error counting user echoes:", countError);
+        res.status(500).json({
+          error: "Failed to count echoes",
+          code: "ECHOES_COUNT_FAILED",
+        } satisfies ApiError);
+        return;
+      }
+
       const { data: echoes, error } = await supabase
         .from("echoes")
         .select(
@@ -1022,7 +1037,7 @@ app.get(
         pagination: {
           limit: limitNum,
           offset: offsetNum,
-          total: echoes?.length || 0,
+          total: totalCount || 0,
         },
       };
 
