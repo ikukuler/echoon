@@ -37,3 +37,6 @@ yarn-error.*
 android/local.properties
 android/
 ios/
+
+echowall-48c39-firebase-adminsdk-fbsvc-9f91a64472.json
+google-services.json
