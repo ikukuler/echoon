@@ -11,7 +11,7 @@ import {
 // В Expo Go нужно использовать IP адрес компьютера, а не localhost
 const API_BASE_URL = __DEV__
   ? "http://192.168.0.107:3000/api" // 🔧 Замените на IP вашего компьютера
-  : "https://your-production-api.com/api";
+  : "https://echoon.onrender.com/api";
 
 class ApiService {
   private async makeRequest<T>(

@@ -196,7 +196,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
 
         {/* Refresh Button */}
-        <TouchableOpacity
+        {/* <TouchableOpacity
           onPress={() => loadEchoes(true, 0)}
           className="mt-3 py-2 px-4 rounded-lg bg-echo self-end"
           disabled={isRefreshing}
@@ -204,7 +204,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <Text className="text-textDark font-medium">
             {isRefreshing ? "Refreshing..." : "Refresh"}
           </Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
 
       {/* Content */}

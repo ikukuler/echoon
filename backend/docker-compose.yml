@@ -6,6 +6,7 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+      - "13962:13962"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --timeout 300 --tcp-keepalive 60
@@ -16,6 +17,10 @@ services:
       retries: 3
     networks:
       - echoon-network
+
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
 
   # EchoOn Backend приложение
   app:
