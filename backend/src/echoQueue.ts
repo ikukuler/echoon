@@ -79,10 +79,12 @@ redisConnection.on("reconnecting", () => {
 // Создание очереди для echo заданий с задержкой для Docker
 const createQueue = async (): Promise<Queue<EchoJobData>> => {
   // Ждем готовности Redis в Docker окружении
+  console.log("🐳 Redis host:", process.env.REDIS_HOST);
+  console.log("🐳 Redis port:", process.env.REDIS_PORT);
   if (process.env.REDIS_HOST && process.env.REDIS_HOST !== "localhost") {
     console.log("🐳 Docker environment detected, waiting for Redis...");
     let retries = 0;
-    const maxRetries = 15;
+    const maxRetries = 5;
 
     while (retries < maxRetries) {
       try {
