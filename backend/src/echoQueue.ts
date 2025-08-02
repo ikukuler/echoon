@@ -21,7 +21,8 @@ const redisOptions: any = {
   connectTimeout: 30000, // Увеличено для Docker
   commandTimeout: 30000, // Увеличено для Docker
   lazyConnect: true, // Не подключаться до первой команды
-  keepAlive: 30000, // Keep-alive для стабильного соединения
+  keepAlive: 30000, // Keep-alive для стабильного соединения,
+  tls: {},
   retryStrategy: (times: number) => {
     const delay = Math.min(times * 200, 10000);
     console.log(`🔄 Redis retry attempt ${times}, waiting ${delay}ms`);
