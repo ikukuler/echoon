@@ -25,6 +25,9 @@ const redisOptions: any = {
   retryStrategy: (times: number) => {
     const delay = Math.min(times * 200, 10000);
     console.log("Redis URL:", process.env.REDIS_URL);
+    console.log("Redis host:", process.env.REDIS_HOST);
+    console.log("Redis port:", process.env.REDIS_PORT);
+    console.log("Redis password:", process.env.REDIS_PASSWORD);
     console.log(`🔄 Redis retry attempt ${times}, waiting ${delay}ms`);
     return times > 15 ? null : delay; // Прекратить после 15 попыток
   },
