@@ -34,8 +34,9 @@ const redisOptions: any = {
 // Если есть REDIS_URL, используем его, иначе используем host/port
 if (process.env.REDIS_URL) {
   redisOptions.url = process.env.REDIS_URL;
+  redisOptions.tls = {};
 } else {
-  redisOptions.host = process.env.REDIS_HOST || "localhost";
+  redisOptions.host = process.env.REDIS_HOST || "redis";
   redisOptions.port = parseInt(process.env.REDIS_PORT || "6379");
 
   // Добавляем пароль, если указан
