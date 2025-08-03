@@ -39,12 +39,12 @@ const redisOptions: any = {
 
 // Если есть REDIS_URL, используем его, иначе используем host/port
 if (process.env.REDIS_URL) {
-  redisOptions.url = process.env.REDIS_URL;
+  // redisOptions.url = process.env.REDIS_URL;
   redisOptions.tls = {};
   console.log("🐳 Redis URL:", process.env.REDIS_URL);
 }
 
-const redisConnection = new Redis(redisOptions);
+const redisConnection = new Redis(process.env.REDIS_URL!, redisOptions);
 
 // Обработчики событий Redis с улучшенным логированием
 redisConnection.on("connect", () => {
