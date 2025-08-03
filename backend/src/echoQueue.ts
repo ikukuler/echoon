@@ -15,8 +15,8 @@ import {
 
 // Настройка Redis подключения для Docker и локальной разработки
 const redisOptions: any = {
-  host: process.env.REDIS_HOST || "localhost",
-  port: parseInt(process.env.REDIS_PORT || "6379"),
+  // host: process.env.REDIS_HOST || "localhost",
+  // port: parseInt(process.env.REDIS_PORT || "6379"),
   maxRetriesPerRequest: null, // BullMQ требует null
   connectTimeout: 30000, // Увеличено для Docker
   commandTimeout: 30000, // Увеличено для Docker
