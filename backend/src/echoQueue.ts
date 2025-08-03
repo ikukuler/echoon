@@ -386,27 +386,30 @@ const echoWorker = new Worker<EchoJobData, EchoJobResult>(
         },
       );
 
-      console.log(`[Job ${jobId}] Push notification result:`, pushResult);
+      console.log(
+        `[Job ${jobId}] Push notification result:`,
+        JSON.stringify(pushResult),
+      );
 
       // 5. Логируем результат в базу (опционально)
-      try {
-        await supabase.from("notification_logs").insert({
-          echo_id: echoId,
-          user_id: userId,
-          notification_type: "push",
-          status: pushResult.success ? "sent" : "failed",
-          tokens_targeted: pushResult.totalTokens,
-          tokens_successful: pushResult.successCount || 0,
-          error_details: pushResult.error || null,
-          sent_at: new Date().toISOString(),
-        });
-      } catch (logError: unknown) {
-        console.warn(
-          `[Job ${jobId}] Failed to log notification result:`,
-          logError,
-        );
-        // Не прерываем выполнение из-за ошибки логирования
-      }
+      // try {
+      //   await supabase.from("notification_logs").insert({
+      //     echo_id: echoId,
+      //     user_id: userId,
+      //     notification_type: "push",
+      //     status: pushResult.success ? "sent" : "failed",
+      //     tokens_targeted: pushResult.totalTokens,
+      //     tokens_successful: pushResult.successCount || 0,
+      //     error_details: pushResult.error || null,
+      //     sent_at: new Date().toISOString(),
+      //   });
+      // } catch (logError: unknown) {
+      //   console.warn(
+      //     `[Job ${jobId}] Failed to log notification result:`,
+      //     logError,
+      //   );
+      //   // Не прерываем выполнение из-за ошибки логирования
+      // }
 
       return {
         success: pushResult.success,
