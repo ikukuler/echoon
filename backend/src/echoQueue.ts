@@ -15,6 +15,8 @@ import {
 
 // Настройка Redis подключения для Docker и локальной разработки
 const redisOptions: any = {
+  host: process.env.REDIS_HOST || "localhost",
+  port: parseInt(process.env.REDIS_PORT || "6379"),
   maxRetriesPerRequest: null, // BullMQ требует null
   connectTimeout: 30000, // Увеличено для Docker
   commandTimeout: 30000, // Увеличено для Docker
@@ -22,6 +24,7 @@ const redisOptions: any = {
   keepAlive: 30000, // Keep-alive для стабильного соединения
   retryStrategy: (times: number) => {
     const delay = Math.min(times * 200, 10000);
+    console.log("Redis URL:", process.env.REDIS_URL);
     console.log(`🔄 Redis retry attempt ${times}, waiting ${delay}ms`);
     return times > 15 ? null : delay; // Прекратить после 15 попыток
   },
@@ -37,9 +40,6 @@ if (process.env.REDIS_URL) {
   redisOptions.tls = {};
   console.log("🐳 Redis URL:", process.env.REDIS_URL);
 } else {
-  redisOptions.host = process.env.REDIS_HOST || "redis";
-  redisOptions.port = parseInt(process.env.REDIS_PORT || "6379");
-
   // Добавляем пароль, если указан
   if (process.env.REDIS_PASSWORD) {
     redisOptions.password = process.env.REDIS_PASSWORD;
