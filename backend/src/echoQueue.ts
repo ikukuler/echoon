@@ -15,14 +15,11 @@ import {
 
 // Настройка Redis подключения для Docker и локальной разработки
 const redisOptions: any = {
-  host: process.env.REDIS_HOST || "localhost",
-  port: parseInt(process.env.REDIS_PORT || "6379"),
   maxRetriesPerRequest: null, // BullMQ требует null
   connectTimeout: 30000, // Увеличено для Docker
   commandTimeout: 30000, // Увеличено для Docker
   lazyConnect: true, // Не подключаться до первой команды
-  keepAlive: 30000, // Keep-alive для стабильного соединения,
-  tls: {},
+  keepAlive: 30000, // Keep-alive для стабильного соединения
   retryStrategy: (times: number) => {
     const delay = Math.min(times * 200, 10000);
     console.log(`🔄 Redis retry attempt ${times}, waiting ${delay}ms`);
@@ -34,8 +31,17 @@ const redisOptions: any = {
   },
 };
 
-if (process.env.REDIS_PASSWORD) {
-  redisOptions.password = process.env.REDIS_PASSWORD;
+// Если есть REDIS_URL, используем его, иначе используем host/port
+if (process.env.REDIS_URL) {
+  redisOptions.url = process.env.REDIS_URL;
+} else {
+  redisOptions.host = process.env.REDIS_HOST || "localhost";
+  redisOptions.port = parseInt(process.env.REDIS_PORT || "6379");
+
+  // Добавляем пароль, если указан
+  if (process.env.REDIS_PASSWORD) {
+    redisOptions.password = process.env.REDIS_PASSWORD;
+  }
 }
 
 const redisConnection = new Redis(redisOptions);
@@ -47,6 +53,7 @@ redisConnection.on("connect", () => {
       process.env.REDIS_PORT || "6379"
     }`,
   );
+  console.log("🐳 Redis connection:", process.env.REDIS_URL);
 });
 
 redisConnection.on("ready", () => {
@@ -80,12 +87,10 @@ redisConnection.on("reconnecting", () => {
 // Создание очереди для echo заданий с задержкой для Docker
 const createQueue = async (): Promise<Queue<EchoJobData>> => {
   // Ждем готовности Redis в Docker окружении
-  console.log("🐳 Redis host:", process.env.REDIS_HOST);
-  console.log("🐳 Redis port:", process.env.REDIS_PORT);
   if (process.env.REDIS_HOST && process.env.REDIS_HOST !== "localhost") {
     console.log("🐳 Docker environment detected, waiting for Redis...");
     let retries = 0;
-    const maxRetries = 5;
+    const maxRetries = 15;
 
     while (retries < maxRetries) {
       try {
