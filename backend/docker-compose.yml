@@ -1,0 +1,85 @@
+services:
+  # Redis для BullMQ очередей
+  redis:
+    image: redis:7-alpine
+    container_name: echoon-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --timeout 300 --tcp-keepalive 60
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - echoon-network
+
+  # EchoOn Backend приложение
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: echoon-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Server Configuration
+      - PORT=3000
+      - NODE_ENV=production
+
+      # Redis Configuration (подключение к Redis контейнеру)
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_URL=${REDIS_URL}
+
+      # Firebase Configuration (заполните своими данными)
+      - FIREBASE_CREDENTIALS=${FIREBASE_CREDENTIALS}
+
+      # Supabase Configuration (заполните своими данными)
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/health",
+          "||",
+          "exit",
+          "1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    networks:
+      - echoon-network
+    volumes:
+      # Опционально: монтируем логи для отладки
+      - ./logs:/app/logs
+      # Для разработки: монтируем исходный код (раскомментируйте для автоматического обновления)
+      # - ./src:/app/dist/src
+      # - ./package.json:/app/package.json
+
+# Volumes для персистентного хранения данных Redis
+volumes:
+  redis_data:
+    driver: local
+
+# Изолированная сеть для сервисов
+networks:
+  echoon-network:
+    driver: bridge
