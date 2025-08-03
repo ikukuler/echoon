@@ -35,6 +35,7 @@ const redisOptions: any = {
 if (process.env.REDIS_URL) {
   redisOptions.url = process.env.REDIS_URL;
   redisOptions.tls = {};
+  console.log("🐳 Redis URL:", process.env.REDIS_URL);
 } else {
   redisOptions.host = process.env.REDIS_HOST || "redis";
   redisOptions.port = parseInt(process.env.REDIS_PORT || "6379");
