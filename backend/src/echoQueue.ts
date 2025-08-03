@@ -39,11 +39,6 @@ if (process.env.REDIS_URL) {
   redisOptions.url = process.env.REDIS_URL;
   redisOptions.tls = {};
   console.log("🐳 Redis URL:", process.env.REDIS_URL);
-} else {
-  // Добавляем пароль, если указан
-  if (process.env.REDIS_PASSWORD) {
-    redisOptions.password = process.env.REDIS_PASSWORD;
-  }
 }
 
 const redisConnection = new Redis(redisOptions);
