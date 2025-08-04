@@ -55,6 +55,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const initializePushNotifications = async (userId: string) => {
+    try {
+      console.log("🔔 Initializing push notifications...");
+      const token = await pushNotificationService.initialize();
+      console.log("🔔 Push token received:", token ? "Yes" : "No");
+
+      if (token && userId) {
+        console.log("🔔 Registering push token on server...");
+        const registerResult = await pushNotificationService.registerToken(
+          userId,
+        );
+        console.log("🔔 Push token registration result:", registerResult);
+      } else {
+        console.log("🔔 No token or user ID for push registration");
+      }
+    } catch (pushError) {
+      console.error("Push notification setup error:", pushError);
+    }
+  };
+
   const login = async (email: string, password: string) => {
     try {
       const result = await authService.login(email, password);
@@ -63,23 +83,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(result.user);
 
         // Инициализируем push-уведомления после успешного входа
-        try {
-          console.log("🔔 Initializing push notifications after login...");
-          const token = await pushNotificationService.initialize();
-          console.log("🔔 Push token received:", token ? "Yes" : "No");
-
-          if (token && result.user.id) {
-            console.log("🔔 Registering push token on server...");
-            const registerResult = await pushNotificationService.registerToken(
-              result.user.id,
-            );
-            console.log("🔔 Push token registration result:", registerResult);
-          } else {
-            console.log("🔔 No token or user ID for push registration");
-          }
-        } catch (pushError) {
-          console.error("Push notification setup error:", pushError);
-        }
+        await initializePushNotifications(result.user.id);
 
         return { success: true };
       } else {
@@ -97,6 +101,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (result.success && result.user) {
         setUser(result.user);
+
+        // Инициализируем push-уведомления после успешной регистрации
+        await initializePushNotifications(result.user.id);
+
         return { success: true };
       } else {
         return { success: false, error: result.error };

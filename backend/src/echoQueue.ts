@@ -287,18 +287,10 @@ function formatMessageFromParts(parts: EchoPart[]): string {
   return parts
     .sort((a, b) => a.order_index - b.order_index)
     .map((part) => {
-      switch (part.type as EchoPartType) {
-        case "text":
-          return part.content;
-        case "image":
-          return `[Изображение: ${part.content}]`;
-        case "audio":
-          return `[Аудио: ${part.content}]`;
-        case "link":
-          return `[Ссылка: ${part.content}]`;
-        default:
-          return part.content;
+      if (part.type === "text") {
+        return part.content;
       }
+      return "";
     })
     .join(" ");
 }

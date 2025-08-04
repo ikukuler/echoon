@@ -40,11 +40,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(0);
-  const [totalEchoes, setTotalEchoes] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
+  // Load more state
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const limit = 10; // Количество эхов на страницу
 
   // Функция для проверки, есть ли у эхо изображения
@@ -65,14 +63,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   const loadEchoes = useCallback(
-    async (isRefresh = false, page = 0) => {
+    async (isRefresh = false) => {
       try {
-        console.log("Loading echoes...", { isRefresh, page });
-        if (isRefresh) setIsRefreshing(true);
-        else if (page === 0) setIsLoading(true);
-        else setIsLoadingMore(true);
+        console.log("Loading echoes...", { isRefresh });
+        if (isRefresh) {
+          setIsRefreshing(true);
+          setEchoes([]); // Очищаем список при обновлении
+        } else if (echoes.length === 0) {
+          setIsLoading(true);
+        } else {
+          setIsLoadingMore(true);
+        }
 
-        const offset = page * limit;
+        const offset = isRefresh ? 0 : echoes.length;
         console.log("API call params:", { offset, limit });
         const response = await apiService.getUserEchoes(offset, limit);
 
@@ -88,15 +91,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           );
           console.log("Pagination info:", pagination);
 
-          if (isRefresh || page === 0) {
+          if (isRefresh) {
             setEchoes(newEchoes);
-            setCurrentPage(0);
-            setTotalEchoes(pagination?.total || 0);
-            setHasMore(offset + limit < (pagination?.total || 0));
           } else {
             setEchoes((prev) => [...prev, ...newEchoes]);
-            setHasMore(offset + limit < (pagination?.total || 0));
           }
+
+          // Проверяем, есть ли еще данные для загрузки
+          setHasMore(offset + limit < (pagination?.total || 0));
         } else {
           console.error("API response error:", response.error);
           Alert.alert("Error", response.error || "Failed to load echoes");
@@ -110,61 +112,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setIsLoadingMore(false);
       }
     },
-    [limit],
+    [echoes.length],
   );
 
-  // Функции для пагинации
-  const loadNextPage = useCallback(() => {
-    console.log("loadNextPage called:", {
-      hasMore,
-      isLoadingMore,
-      currentPage,
-    });
-    if (hasMore && !isLoadingMore) {
-      const nextPage = currentPage + 1;
-      console.log("Loading next page:", nextPage);
-      setCurrentPage(nextPage);
-      loadEchoes(false, nextPage);
+  // Функция для загрузки следующей страницы
+  const handleLoadMore = useCallback(() => {
+    if (hasMore && !isLoadingMore && !isRefreshing) {
+      console.log("Loading more echoes...");
+      loadEchoes(false);
     }
-  }, [hasMore, isLoadingMore, currentPage, loadEchoes]);
-
-  const loadPreviousPage = useCallback(() => {
-    console.log("loadPreviousPage called:", { currentPage, isLoadingMore });
-    if (currentPage > 0 && !isLoadingMore) {
-      const prevPage = currentPage - 1;
-      console.log("Loading previous page:", prevPage);
-      setCurrentPage(prevPage);
-      loadEchoes(false, prevPage);
-    }
-  }, [currentPage, isLoadingMore, loadEchoes]);
-
-  const goToFirstPage = useCallback(() => {
-    console.log("goToFirstPage called:", { currentPage, isLoadingMore });
-    if (currentPage > 0 && !isLoadingMore) {
-      console.log("Going to first page");
-      setCurrentPage(0);
-      loadEchoes(false, 0);
-    }
-  }, [currentPage, isLoadingMore, loadEchoes]);
-
-  const goToLastPage = useCallback(() => {
-    const lastPage = Math.floor((totalEchoes - 1) / limit);
-    console.log("goToLastPage called:", {
-      currentPage,
-      lastPage,
-      totalEchoes,
-      isLoadingMore,
-    });
-    if (currentPage !== lastPage && !isLoadingMore) {
-      console.log("Going to last page:", lastPage);
-      setCurrentPage(lastPage);
-      loadEchoes(false, lastPage);
-    }
-  }, [currentPage, totalEchoes, limit, isLoadingMore, loadEchoes]);
+  }, [hasMore, isLoadingMore, isRefreshing, loadEchoes]);
 
   useEffect(() => {
-    loadEchoes(false, 0);
-  }, [loadEchoes]);
+    loadEchoes(true); // Загружаем первую страницу при монтировании
+  }, []);
 
   if (isLoading) {
     return <LoadingSpinner text="Loading your echoes..." />;
@@ -197,7 +158,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         {/* Refresh Button */}
         {/* <TouchableOpacity
-          onPress={() => loadEchoes(true, 0)}
+          onPress={() => loadEchoes(true)}
           className="mt-3 py-2 px-4 rounded-lg bg-echo self-end"
           disabled={isRefreshing}
         >
@@ -284,7 +245,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           {/* Echoes List */}
           <View>
             <Text className="text-3xl text-textDark mb-4 font-playfair-bold">
-              Your Echoes ({totalEchoes})
+              Your Echoes ({echoes.length})
             </Text>
 
             {echoes.length === 0 ? (
@@ -565,140 +526,34 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               })
             )}
 
-            {/* Pagination Controls */}
-            {echoes.length > 0 && (
+            {/* Load More Button */}
+            {hasMore && (
               <View className="mt-8 mb-4">
-                {/* Page Info */}
-                <View className="flex-row justify-center items-center mb-4">
-                  <Text className="text-accentSecondary text-sm font-inter-bold">
-                    Page {currentPage + 1} of {Math.ceil(totalEchoes / limit)}
-                  </Text>
-                </View>
-
-                {/* Pagination Buttons */}
-                <View className="flex-row justify-center items-center gap-4">
-                  {/* First Page Button */}
-                  <TouchableOpacity
-                    onPress={goToFirstPage}
-                    disabled={currentPage === 0 || isLoadingMore}
-                    className={`px-4 py-3 rounded-xl flex-row items-center gap-2 ${
-                      currentPage === 0 || isLoadingMore
-                        ? "bg-gray-300 opacity-50"
-                        : "bg-echo shadow-sm"
-                    }`}
-                    activeOpacity={0.7}
-                  >
-                    <HugeiconsIcon
-                      icon={ArrowLeft01Icon}
-                      size={20}
-                      color={
-                        currentPage === 0 || isLoadingMore ? "#9CA3AF" : "#000"
-                      }
-                      strokeWidth={2}
-                    />
-                    <HugeiconsIcon
-                      icon={ArrowLeft01Icon}
-                      size={20}
-                      color={
-                        currentPage === 0 || isLoadingMore ? "#9CA3AF" : "#000"
-                      }
-                      strokeWidth={2}
-                    />
-                  </TouchableOpacity>
-
-                  {/* Previous Page Button */}
-                  <TouchableOpacity
-                    onPress={loadPreviousPage}
-                    disabled={currentPage === 0 || isLoadingMore}
-                    className={`px-4 py-3 rounded-xl flex-row items-center gap-2 ${
-                      currentPage === 0 || isLoadingMore
-                        ? "bg-gray-300 opacity-50"
-                        : "bg-echo shadow-sm"
-                    }`}
-                    activeOpacity={0.7}
-                  >
-                    <HugeiconsIcon
-                      icon={ArrowLeft01Icon}
-                      size={20}
-                      color={
-                        currentPage === 0 || isLoadingMore ? "#9CA3AF" : "#000"
-                      }
-                      strokeWidth={2}
-                    />
-                    <Text
-                      className={`font-inter-bold ${
-                        currentPage === 0 || isLoadingMore
-                          ? "text-gray-500"
-                          : "text-black"
-                      }`}
-                    >
-                      Previous
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* Next Page Button */}
-                  <TouchableOpacity
-                    onPress={loadNextPage}
-                    disabled={!hasMore || isLoadingMore}
-                    className={`px-4 py-3 rounded-xl flex-row items-center gap-2 ${
-                      !hasMore || isLoadingMore
-                        ? "bg-gray-300 opacity-50"
-                        : "bg-echo shadow-sm"
-                    }`}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      className={`font-inter-bold ${
-                        !hasMore || isLoadingMore
-                          ? "text-gray-500"
-                          : "text-black"
-                      }`}
-                    >
-                      Next
-                    </Text>
-                    <HugeiconsIcon
-                      icon={ArrowRight01Icon}
-                      size={20}
-                      color={!hasMore || isLoadingMore ? "#9CA3AF" : "#000"}
-                      strokeWidth={2}
-                    />
-                  </TouchableOpacity>
-
-                  {/* Last Page Button */}
-                  <TouchableOpacity
-                    onPress={goToLastPage}
-                    disabled={!hasMore || isLoadingMore}
-                    className={`px-4 py-3 rounded-xl flex-row items-center gap-2 ${
-                      !hasMore || isLoadingMore
-                        ? "bg-gray-300 opacity-50"
-                        : "bg-echo shadow-sm"
-                    }`}
-                    activeOpacity={0.7}
-                  >
-                    <HugeiconsIcon
-                      icon={ArrowRight01Icon}
-                      size={20}
-                      color={!hasMore || isLoadingMore ? "#9CA3AF" : "#000"}
-                      strokeWidth={2}
-                    />
-                    <HugeiconsIcon
-                      icon={ArrowRight01Icon}
-                      size={20}
-                      color={!hasMore || isLoadingMore ? "#9CA3AF" : "#000"}
-                      strokeWidth={2}
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Loading More Indicator */}
-                {isLoadingMore && (
-                  <View className="flex-row justify-center items-center mt-4">
-                    <ActivityIndicator size="small" color="#0EA5E9" />
-                    <Text className="text-accentSecondary text-sm ml-2 font-inter-bold">
-                      Loading more echoes...
-                    </Text>
-                  </View>
-                )}
+                <TouchableOpacity
+                  onPress={handleLoadMore}
+                  disabled={isLoadingMore || isRefreshing}
+                  className={`px-6 py-4 rounded-xl flex-row justify-center items-center gap-3 ${
+                    isLoadingMore || isRefreshing
+                      ? "bg-gray-300 opacity-50"
+                      : "bg-echo shadow-sm"
+                  }`}
+                  activeOpacity={0.7}
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <ActivityIndicator size="small" color="#0EA5E9" />
+                      <Text className="text-accentSecondary text-base font-inter-bold">
+                        Loading more echoes...
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text className="text-black text-base font-inter-bold">
+                        Load More Echoes
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
               </View>
             )}
           </View>
