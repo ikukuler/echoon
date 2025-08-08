@@ -31,11 +31,15 @@ const AppNavigator: React.FC = () => {
   const fontsLoaded = useFonts();
   const [navigationReady, setNavigationReady] = React.useState(false);
 
+  // Ref для хранения данных уведомления до авторизации
+  const pendingNotificationRef = useRef<PushNotificationData | null>(null);
+
   // Настраиваем обработчики push-уведомлений
   React.useEffect(() => {
-    if (user && navigationRef.current && navigationReady) {
+    if (navigationRef.current && navigationReady) {
       const cleanup = pushNotificationService.setupNotificationHandlers(
         navigationRef.current,
+        pendingNotificationRef,
       );
 
       // 2. Обрабатываем пуш при холодном старте
@@ -50,6 +54,16 @@ const AppNavigator: React.FC = () => {
           console.log("📦 Cold start notification data:", data);
 
           if (data.echoId && data.type === "echo_reminder") {
+            // Если пользователь не авторизован, сохраняем данные
+            if (!user) {
+              console.log(
+                "📦 User not authenticated, storing notification data",
+              );
+              pendingNotificationRef.current = data;
+              return;
+            }
+
+            // Если пользователь авторизован, сразу навигируем
             navigationRef.current.navigate("EchoDetail", {
               echoId: data.echoId,
               fromNotification: true,
@@ -60,6 +74,52 @@ const AppNavigator: React.FC = () => {
 
       checkInitialNotification();
       return cleanup;
+    }
+  }, [user, navigationReady]);
+
+  // Обрабатываем отложенное уведомление после авторизации
+  React.useEffect(() => {
+    console.log("🔍 Checking pending notification:", {
+      user: !!user,
+      navigationRef: !!navigationRef.current,
+      navigationReady,
+      pendingNotification: !!pendingNotificationRef.current,
+    });
+
+    if (
+      user &&
+      navigationRef.current &&
+      navigationReady &&
+      pendingNotificationRef.current
+    ) {
+      const pendingData = pendingNotificationRef.current;
+      console.log(
+        "📦 Processing pending notification after login:",
+        pendingData,
+      );
+
+      if (pendingData.echoId && pendingData.type === "echo_reminder") {
+        console.log("🚀 Attempting to navigate to EchoDetail with:", {
+          echoId: pendingData.echoId,
+          fromNotification: true,
+        });
+
+        // Добавляем небольшую задержку для обеспечения готовности экрана
+        setTimeout(() => {
+          try {
+            navigationRef.current.navigate("EchoDetail", {
+              echoId: pendingData.echoId,
+              fromNotification: true,
+            });
+            console.log("✅ Navigation successful");
+          } catch (error) {
+            console.error("❌ Navigation failed:", error);
+          }
+        }, 100);
+      }
+
+      // Очищаем отложенные данные
+      pendingNotificationRef.current = null;
     }
   }, [user, navigationReady]);
 

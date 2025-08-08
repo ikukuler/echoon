@@ -1,3 +1,4 @@
+import React from "react";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
@@ -104,7 +105,10 @@ class PushNotificationService {
   }
 
   // Настройка обработчиков уведомлений
-  setupNotificationHandlers(navigation: any) {
+  setupNotificationHandlers(
+    navigation: any,
+    pendingNotificationRef?: React.MutableRefObject<PushNotificationData | null>,
+  ) {
     // Обработчик получения уведомления когда приложение открыто
     const notificationListener = Notifications.addNotificationReceivedListener(
       (notification) => {
@@ -138,11 +142,33 @@ class PushNotificationService {
               console.log("🔑 Auth token available:", !!token);
 
               if (!token) {
-                console.log("❌ No auth token available, cannot load echo");
+                console.log(
+                  "❌ No auth token available, storing notification data",
+                );
+                // Сохраняем данные уведомления для обработки после авторизации
+                if (pendingNotificationRef) {
+                  pendingNotificationRef.current = data;
+                  console.log(
+                    "💾 Stored notification data in pendingNotificationRef",
+                  );
+                } else {
+                  console.log("❌ No pendingNotificationRef available");
+                }
                 return;
               }
             } catch (error) {
               console.log("❌ Auth error:", error);
+              // Сохраняем данные уведомления для обработки после авторизации
+              if (pendingNotificationRef) {
+                pendingNotificationRef.current = data;
+                console.log(
+                  "💾 Stored notification data in pendingNotificationRef after auth error",
+                );
+              } else {
+                console.log(
+                  "❌ No pendingNotificationRef available after auth error",
+                );
+              }
               return;
             }
 
@@ -152,10 +178,15 @@ class PushNotificationService {
                 echoId: data.echoId,
                 fromNotification: true,
               });
-              navigation.navigate("EchoDetail", {
-                echoId: data.echoId,
-                fromNotification: true,
-              });
+              try {
+                navigation.navigate("EchoDetail", {
+                  echoId: data.echoId,
+                  fromNotification: true,
+                });
+                console.log("✅ Navigation successful from notification");
+              } catch (error) {
+                console.error("❌ Navigation failed from notification:", error);
+              }
             } else {
               console.log("❌ Navigation not available");
             }

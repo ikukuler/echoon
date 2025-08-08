@@ -190,27 +190,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
 
           {/* Test Notification Button */}
-          {
-            // <TouchableOpacity
-            //   className="bg-accentSecondary py-3 px-6 rounded-xl mb-8 shadow-sm"
-            //   onPress={async () => {
-            //     await pushNotificationService.sendDemoNotification(
-            //       "demo-echo-id",
-            //       "This is a demo echo reminder! 🎉",
-            //     );
-            //   }}
-            // >
-            //   <Text className="text-white text-base font-bold text-center">
-            //     <HugeiconsIcon
-            //       icon={SchoolBell02FreeIcons}
-            //       size={24}
-            //       color="white"
-            //       strokeWidth={1.5}
-            //     />{" "}
-            //     Test Push Notification
-            //   </Text>
-            // </TouchableOpacity>
-          }
+          <TouchableOpacity
+            className="bg-accentSecondary py-3 px-6 rounded-xl mb-8 shadow-sm"
+            onPress={async () => {
+              await pushNotificationService.sendDemoNotification(
+                "demo-echo-id",
+                "This is a demo echo reminder! 🎉",
+              );
+            }}
+          >
+            <Text className="text-white text-base font-bold text-center">
+              <HugeiconsIcon
+                icon={SchoolBell02FreeIcons}
+                size={24}
+                color="white"
+                strokeWidth={1.5}
+              />{" "}
+              Test Push Notification
+            </Text>
+          </TouchableOpacity>
 
           {/* Force Register Token Button */}
           {/* <TouchableOpacity
@@ -241,6 +239,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               🔄 Force Register Token
             </Text>
           </TouchableOpacity> */}
+
+          {/* Test Direct Navigation Button */}
+          <TouchableOpacity
+            className="bg-primary py-3 px-6 rounded-xl mb-8 shadow-sm"
+            onPress={() => {
+              console.log("🧪 Testing direct navigation to EchoDetail");
+              try {
+                navigation.navigate("EchoDetail", {
+                  echoId: "test-echo-id",
+                  fromNotification: true,
+                });
+                console.log("✅ Direct navigation successful");
+              } catch (error) {
+                console.error("❌ Direct navigation failed:", error);
+              }
+            }}
+          >
+            <Text className="text-white text-base font-bold text-center">
+              🧪 Test Direct Navigation
+            </Text>
+          </TouchableOpacity>
 
           {/* Echoes List */}
           <View>
