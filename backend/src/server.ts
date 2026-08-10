@@ -1,4 +1,5 @@
 import "dotenv/config";
+import crypto from "crypto";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import multer from "multer";
@@ -91,8 +92,58 @@ app.use(express.json());
 // Trust proxy for accurate IP addresses (важно для rate limiting)
 app.set("trust proxy", 1);
 
+// Basic Auth для Bull Board UI - без учётных данных в env доступ полностью закрыт
+function timingSafeStringEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    // Сравниваем с буфером той же длины, чтобы не выдавать длину секрета через тайминг
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function bullBoardAuth(req: Request, res: Response, next: NextFunction): void {
+  const adminUser = process.env.BULL_BOARD_USER;
+  const adminPassword = process.env.BULL_BOARD_PASSWORD;
+
+  if (!adminUser || !adminPassword) {
+    console.error(
+      "❌ BULL_BOARD_USER/BULL_BOARD_PASSWORD not set - blocking access to /admin/queues",
+    );
+    res.status(503).json({ error: "Bull Board is not configured" });
+    return;
+  }
+
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Basic ")) {
+    res.set("WWW-Authenticate", 'Basic realm="Bull Board"');
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const decoded = Buffer.from(authHeader.substring(6), "base64").toString(
+    "utf-8",
+  );
+  const separatorIndex = decoded.indexOf(":");
+  const user = decoded.substring(0, separatorIndex);
+  const password = decoded.substring(separatorIndex + 1);
+
+  if (
+    !timingSafeStringEqual(user, adminUser) ||
+    !timingSafeStringEqual(password, adminPassword)
+  ) {
+    res.set("WWW-Authenticate", 'Basic realm="Bull Board"');
+    res.status(401).json({ error: "Invalid credentials" });
+    return;
+  }
+
+  next();
+}
+
 // Bull Board UI (before global rate limiter to avoid limiting admin access)
-app.use("/admin/queues", (req, res, next) => {
+app.use("/admin/queues", bullBoardAuth, (req, res, next) => {
   if (!bullBoardInitialized) {
     return res.status(503).json({
       error: "Bull Board is initializing",
@@ -614,7 +665,9 @@ app.post(
       console.error(`[${requestId}] Unhandled error in /api/echoes:`, {
         error: error instanceof Error ? error.message : "Unknown error",
         stack: error instanceof Error ? error.stack : undefined,
-        body: req.body,
+        partsCount: Array.isArray(req.body?.parts)
+          ? req.body.parts.length
+          : undefined,
       });
 
       res.status(500).json({

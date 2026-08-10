@@ -24,10 +24,6 @@ const redisOptions: any = {
   keepAlive: 30000, // Keep-alive для стабильного соединения
   retryStrategy: (times: number) => {
     const delay = Math.min(times * 200, 10000);
-    console.log("Redis URL:", process.env.REDIS_URL);
-    console.log("Redis host:", process.env.REDIS_HOST);
-    console.log("Redis port:", process.env.REDIS_PORT);
-    console.log("Redis password:", process.env.REDIS_PASSWORD);
     console.log(`🔄 Redis retry attempt ${times}, waiting ${delay}ms`);
     return times > 15 ? null : delay; // Прекратить после 15 попыток
   },
@@ -38,10 +34,12 @@ const redisOptions: any = {
 };
 
 // Если есть REDIS_URL, используем его, иначе используем host/port
+// TLS включаем только для rediss:// (например, Aiven) - локальный Redis/Valkey его не поддерживает
 if (process.env.REDIS_URL) {
-  // redisOptions.url = process.env.REDIS_URL;
-  redisOptions.tls = {};
-  console.log("🐳 Redis URL:", process.env.REDIS_URL);
+  if (process.env.REDIS_URL.startsWith("rediss://")) {
+    redisOptions.tls = {};
+  }
+  console.log("🐳 Using REDIS_URL for connection");
 }
 
 const redisConnection = new Redis(process.env.REDIS_URL!, redisOptions);
@@ -53,7 +51,6 @@ redisConnection.on("connect", () => {
       process.env.REDIS_PORT || "6379"
     }`,
   );
-  console.log("🐳 Redis connection:", process.env.REDIS_URL);
 });
 
 redisConnection.on("ready", () => {

@@ -65,17 +65,14 @@ function initializeSupabaseClient(): SupabaseClient {
           // Authorization: `Bearer ${serviceRoleKey}`,
         },
         fetch: async (url, options) => {
-          console.log("📤 Supabase Request:");
-          console.log("URL:", url);
-          console.log("Method:", options?.method);
-          console.log("Headers:", options?.headers);
-          if (options?.body) {
-            console.log("Body:", options.body.toString());
-          }
-
           const res = await fetch(url, options);
 
-          console.log("📥 Supabase Response:", res.status, res.statusText);
+          if (!res.ok) {
+            console.error(
+              `📥 Supabase request failed: ${options?.method || "GET"} ${url} -> ${res.status} ${res.statusText}`,
+            );
+          }
+
           return res;
         },
       },

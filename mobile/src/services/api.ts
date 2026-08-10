@@ -29,7 +29,6 @@ class ApiService {
 
       if (token) {
         headers.Authorization = `Bearer ${token}`;
-        console.log("🔑 Using token:", token);
       } else {
         console.log("⚠️ No token available");
       }

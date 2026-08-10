@@ -32,5 +32,7 @@ export default async (): Promise<void> => {
   process.env.REDIS_HOST = "localhost";
   process.env.REDIS_PORT = "6379";
 
+  process.env.JWT_SECRET = "test-jwt-secret-do-not-use-in-production";
+
   console.log("✅ Test environment setup complete");
 };

@@ -2,8 +2,13 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { supabase } from "./supabaseClient";
 
-const JWT_SECRET =
-  process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
+if (!process.env.JWT_SECRET) {
+  throw new Error(
+    "JWT_SECRET environment variable is required and must not use a default value",
+  );
+}
+
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = "7d";
 
 export interface User {
