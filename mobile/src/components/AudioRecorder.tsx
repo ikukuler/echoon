@@ -1,16 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Alert,
-  Modal,
-  ActivityIndicator,
-} from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Alert, AppState, Linking, Modal, Text, View } from "react-native";
 import { Audio } from "expo-av";
-import * as MediaLibrary from "expo-media-library";
-import { HugeiconsIcon } from "@hugeicons/react-native";
-import { Mic02Icon, StopIcon } from "@hugeicons/core-free-icons";
+import { AppButton, AppCard } from "./ui";
+import { colors, fontFamilies, radii, spacing } from "../theme";
 
 interface AudioRecorderProps {
   visible: boolean;
@@ -18,51 +10,94 @@ interface AudioRecorderProps {
   onRecordingComplete: (uri: string, duration: number) => void;
 }
 
+type PermissionState = "unknown" | "requesting" | "granted" | "denied";
+
+const MAX_RECORDING_TIME = 30;
+
 export const AudioRecorder: React.FC<AudioRecorderProps> = ({
   visible,
   onClose,
   onRecordingComplete,
 }) => {
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const processingRef = useRef(false);
+  const [permissionState, setPermissionState] =
+    useState<PermissionState>("unknown");
+  const [canAskAgain, setCanAskAgain] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasPermission, setHasPermission] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const MAX_RECORDING_TIME = 30; // 30 seconds
+  const clearTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
 
-  useEffect(() => {
-    requestPermissions();
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
+  const requestPermission = async () => {
+    setPermissionState("requesting");
+    setError(null);
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      setCanAskAgain(permission.canAskAgain);
+      setPermissionState(permission.granted ? "granted" : "denied");
+    } catch (permissionError) {
+      console.error("Failed to request audio permission:", permissionError);
+      setPermissionState("denied");
+      setError("Microphone access could not be requested.");
+    }
+  };
+
+  const finishRecording = async (complete: boolean) => {
+    if (processingRef.current) return;
+
+    const recording = recordingRef.current;
+    if (!recording) return;
+
+    processingRef.current = true;
+    setIsProcessing(true);
+    setIsRecording(false);
+    clearTimer();
+
+    try {
+      const status = await recording.getStatusAsync();
+      const duration = status.isRecording
+        ? status.durationMillis / 1000
+        : recordingTime;
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+
+      recordingRef.current = null;
+      setRecordingTime(0);
+
+      if (complete) {
+        if (!uri) throw new Error("Recording finished without a file URI");
+        onRecordingComplete(uri, duration);
       }
-    };
-  }, []);
-
-  const requestPermissions = async () => {
-    const { status: audioStatus } = await Audio.requestPermissionsAsync();
-    const { status: mediaStatus } =
-      await MediaLibrary.requestPermissionsAsync();
-
-    if (audioStatus === "granted" && mediaStatus === "granted") {
-      setHasPermission(true);
-    } else {
-      Alert.alert(
-        "Permissions Required",
-        "Audio and media library permissions are required to record audio.",
+    } catch (recordingError) {
+      console.error("Failed to finish recording:", recordingError);
+      recordingRef.current = null;
+      setError(
+        complete
+          ? "The recording could not be completed. Please try again."
+          : "The recording could not be discarded safely.",
       );
+    } finally {
+      processingRef.current = false;
+      setIsProcessing(false);
     }
   };
 
   const startRecording = async () => {
-    try {
-      if (!hasPermission) {
-        await requestPermissions();
-        return;
-      }
+    if (permissionState !== "granted" || processingRef.current) return;
 
+    setError(null);
+    setIsProcessing(true);
+    processingRef.current = true;
+    try {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -71,211 +106,284 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
       const { recording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY,
       );
-
-      setRecording(recording);
-      setIsRecording(true);
+      recordingRef.current = recording;
       setRecordingTime(0);
+      setIsRecording(true);
 
-      // Start timer
       timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => {
-          if (prev >= MAX_RECORDING_TIME) {
-            stopRecording();
-            return prev;
-          }
-          return prev + 1;
+        setRecordingTime((current) => {
+          const next = Math.min(current + 1, MAX_RECORDING_TIME);
+          if (next >= MAX_RECORDING_TIME) void finishRecording(true);
+          return next;
         });
       }, 1000);
-    } catch (error) {
-      console.error("Failed to start recording:", error);
-      Alert.alert("Error", "Failed to start recording");
+    } catch (recordingError) {
+      console.error("Failed to start recording:", recordingError);
+      recordingRef.current = null;
+      setError("Recording could not be started. Please try again.");
+    } finally {
+      processingRef.current = false;
+      setIsProcessing(false);
     }
   };
 
-  const stopRecording = async () => {
-    try {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
+  const requestClose = () => {
+    if (isProcessing) return;
+
+    if (!isRecording) {
+      onClose();
+      return;
+    }
+
+    Alert.alert(
+      "Discard recording?",
+      "Your current recording will not be attached to this echo.",
+      [
+        { text: "Keep Recording", style: "cancel" },
+        {
+          text: "Discard",
+          style: "destructive",
+          onPress: async () => {
+            await finishRecording(false);
+            onClose();
+          },
+        },
+      ],
+    );
+  };
+
+  useEffect(() => {
+    if (visible && permissionState === "unknown") {
+      requestPermission();
+    }
+  }, [visible, permissionState]);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const refreshPermission = async () => {
+      try {
+        const permission = await Audio.getPermissionsAsync();
+        setCanAskAgain(permission.canAskAgain);
+        if (permission.granted) setPermissionState("granted");
+      } catch (permissionError) {
+        console.error("Failed to refresh audio permission:", permissionError);
       }
+    };
 
-      if (!recording) return;
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") refreshPermission();
+    });
 
-      setIsRecording(false);
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
+    return () => subscription.remove();
+  }, [visible]);
 
-      if (uri) {
-        // Save to media library
-        await MediaLibrary.saveToLibraryAsync(uri);
-
-        // Get recording duration
-        const status = await recording.getStatusAsync();
-        const duration = status.durationMillis
-          ? status.durationMillis / 1000
-          : 0;
-
-        onRecordingComplete(uri, duration);
+  useEffect(() => {
+    return () => {
+      clearTimer();
+      const recording = recordingRef.current;
+      recordingRef.current = null;
+      if (recording) {
+        recording.stopAndUnloadAsync().catch((cleanupError) => {
+          console.error("Failed to clean up recording:", cleanupError);
+        });
       }
+    };
+  }, []);
 
-      setRecording(null);
-      setRecordingTime(0);
-    } catch (error) {
-      console.error("Failed to stop recording:", error);
-      Alert.alert("Error", "Failed to stop recording");
-    }
-  };
-
-  const cancelRecording = async () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
-    if (recording) {
-      await recording.stopAndUnloadAsync();
-      setRecording(null);
-    }
-
-    setIsRecording(false);
-    setRecordingTime(0);
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const getProgressPercentage = () => {
-    return (recordingTime / MAX_RECORDING_TIME) * 100;
-  };
+  const progress = Math.min(recordingTime / MAX_RECORDING_TIME, 1);
 
   return (
     <Modal
       visible={visible}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={onClose}
+      transparent
+      animationType="fade"
+      onRequestClose={requestClose}
     >
-      <View className="flex-1 bg-black/50 justify-center items-center">
-        <View className="bg-card rounded-2xl p-6 w-80 max-w-sm">
-          <Text className="text-2xl font-bold text-gray-900 text-center mb-6">
+      <View
+        accessibilityViewIsModal
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          padding: spacing.xl,
+          backgroundColor: colors.scrim,
+        }}
+      >
+        <AppCard style={{ width: "100%", maxWidth: 380, gap: spacing.xl }}>
+          <Text
+            accessibilityRole="header"
+            style={{
+              color: colors.content,
+              fontFamily: fontFamilies.displayBold,
+              fontSize: 26,
+              textAlign: "center",
+            }}
+          >
             Record Audio
           </Text>
 
-          {!hasPermission && (
-            <View className="mb-6">
-              <Text className="text-red-600 text-center mb-4">
-                Audio permissions required
-              </Text>
-              <TouchableOpacity
-                className="bg-blue-500 rounded-lg py-3 px-4"
-                onPress={requestPermissions}
-              >
-                <Text className="text-white text-center font-medium">
-                  Grant Permissions
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {hasPermission && (
+          {permissionState !== "granted" ? (
+            <PermissionContent
+              state={permissionState}
+              canAskAgain={canAskAgain}
+              error={error}
+              onRequestPermission={requestPermission}
+              onClose={onClose}
+            />
+          ) : (
             <>
-              {/* Recording Timer */}
-              <View className="items-center mb-6">
-                <Text className="text-4xl font-mono text-gray-900 mb-2">
+              <View style={{ alignItems: "center", gap: spacing.xs }}>
+                <Text
+                  accessibilityLiveRegion="polite"
+                  style={{
+                    color: colors.content,
+                    fontFamily: fontFamilies.bodyBold,
+                    fontSize: 42,
+                    fontVariant: ["tabular-nums"],
+                  }}
+                >
                   {formatTime(recordingTime)}
                 </Text>
-                <Text className="text-sm text-gray-500">
-                  Max: {formatTime(MAX_RECORDING_TIME)}
+                <Text
+                  style={{
+                    color: colors.contentMuted,
+                    fontFamily: fontFamilies.body,
+                    fontSize: 14,
+                  }}
+                >
+                  Maximum {formatTime(MAX_RECORDING_TIME)}
                 </Text>
               </View>
 
-              {/* Progress Bar */}
-              <View className="bg-gray-200 rounded-full h-2 mb-6">
+              <View
+                accessible
+                accessibilityRole="progressbar"
+                accessibilityLabel="Recording time"
+                accessibilityValue={{
+                  min: 0,
+                  max: MAX_RECORDING_TIME,
+                  now: recordingTime,
+                  text: `${recordingTime} of ${MAX_RECORDING_TIME} seconds`,
+                }}
+                style={{
+                  height: 8,
+                  overflow: "hidden",
+                  borderRadius: radii.pill,
+                  backgroundColor: colors.disabledSurface,
+                }}
+              >
                 <View
-                  className="bg-blue-500 h-2 rounded-full"
-                  style={{ width: `${getProgressPercentage()}%` }}
+                  style={{
+                    width: `${progress * 100}%`,
+                    height: "100%",
+                    backgroundColor: isRecording
+                      ? colors.danger
+                      : colors.content,
+                  }}
                 />
               </View>
 
-              {/* Recording Status */}
-              {isRecording && (
-                <View className="items-center mb-6">
-                  <View className="w-4 h-4 bg-red-500 rounded-full animate-pulse mb-2" />
-                  <Text className="text-red-600 font-medium">Recording...</Text>
-                </View>
+              <Text
+                accessibilityLiveRegion="polite"
+                style={{
+                  color: isRecording ? colors.danger : colors.contentMuted,
+                  fontFamily: fontFamilies.bodySemibold,
+                  fontSize: 15,
+                  textAlign: "center",
+                }}
+              >
+                {isProcessing
+                  ? "Processing recording…"
+                  : isRecording
+                    ? "Recording in progress"
+                    : "Ready to record"}
+              </Text>
+
+              {error && (
+                <Text
+                  accessibilityLiveRegion="assertive"
+                  selectable
+                  style={{
+                    color: colors.danger,
+                    fontFamily: fontFamilies.bodySemibold,
+                    fontSize: 14,
+                    lineHeight: 20,
+                    textAlign: "center",
+                  }}
+                >
+                  {error}
+                </Text>
               )}
 
-              {/* Controls */}
-              <View className="flex-row justify-center space-x-4">
-                {!isRecording ? (
-                  <TouchableOpacity
-                    className="bg-red-500 rounded-full w-16 h-16 justify-center items-center"
-                    onPress={startRecording}
-                    disabled={isLoading}
-                  >
-                    <Text className="text-white text-2xl">
-                      <HugeiconsIcon
-                        icon={Mic02Icon}
-                        size={24}
-                        color="white"
-                        strokeWidth={1.5}
-                      />
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    className="bg-gray-500 rounded-full w-16 h-16 justify-center items-center"
-                    onPress={stopRecording}
-                    disabled={isLoading}
-                  >
-                    <Text className="text-white text-2xl">
-                      <HugeiconsIcon
-                        icon={StopIcon}
-                        size={24}
-                        color="white"
-                        strokeWidth={1.5}
-                      />
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {/* Action Buttons */}
-              <View className="flex-row justify-between mt-6">
-                <TouchableOpacity
-                  className="bg-gray-300 rounded-lg py-3 px-4 flex-1 mr-2"
-                  onPress={cancelRecording}
-                  disabled={isLoading}
-                >
-                  <Text className="text-gray-700 text-center font-medium">
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  className="bg-gray-300 rounded-lg py-3 px-4 flex-1 ml-2"
-                  onPress={onClose}
-                  disabled={isLoading}
-                >
-                  <Text className="text-gray-700 text-center font-medium">
-                    Close
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              <AppButton
+                label={isRecording ? "Finish Recording" : "Start Recording"}
+                variant={isRecording ? "danger" : "primary"}
+                loading={isProcessing}
+                onPress={
+                  isRecording ? () => finishRecording(true) : startRecording
+                }
+              />
+              <AppButton
+                label={isRecording ? "Discard or Close" : "Close"}
+                variant="quiet"
+                disabled={isProcessing}
+                onPress={requestClose}
+              />
             </>
           )}
-
-          {isLoading && (
-            <View className="absolute inset-0 bg-white/80 justify-center items-center rounded-2xl">
-              <ActivityIndicator size="large" color="#0ea5e9" />
-              <Text className="text-gray-600 mt-2">Processing...</Text>
-            </View>
-          )}
-        </View>
+        </AppCard>
       </View>
     </Modal>
   );
 };
+
+function PermissionContent({
+  state,
+  canAskAgain,
+  error,
+  onRequestPermission,
+  onClose,
+}: {
+  state: PermissionState;
+  canAskAgain: boolean;
+  error: string | null;
+  onRequestPermission: () => void;
+  onClose: () => void;
+}) {
+  const requesting = state === "requesting";
+
+  return (
+    <View style={{ gap: spacing.lg }}>
+      <Text
+        selectable
+        style={{
+          color: error ? colors.danger : colors.contentMuted,
+          fontFamily: fontFamilies.body,
+          fontSize: 15,
+          lineHeight: 22,
+          textAlign: "center",
+        }}
+      >
+        {error ??
+          (requesting
+            ? "Requesting microphone access…"
+            : "Microphone access is required to record an echo.")}
+      </Text>
+      <AppButton
+        label={canAskAgain ? "Allow Microphone" : "Open Settings"}
+        loading={requesting}
+        onPress={
+          canAskAgain ? onRequestPermission : () => Linking.openSettings()
+        }
+      />
+      <AppButton label="Not Now" variant="quiet" onPress={onClose} />
+    </View>
+  );
+}
+
+function formatTime(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}:${remainder.toString().padStart(2, "0")}`;
+}

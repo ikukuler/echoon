@@ -1,185 +1,322 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
-  View,
+  KeyboardAvoidingView,
+  ScrollView,
   Text,
   TextInput,
-  TouchableOpacity,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
+  View,
 } from "react-native";
 import { useAuth } from "../hooks/useAuth";
 import { LoadingSpinner } from "../components/LoadingSpinner";
+import { AppButton, AppCard, FormField } from "../components/ui";
+import { colors, fontFamilies, radii, spacing } from "../theme";
+
+interface FieldErrors {
+  email?: string;
+  password?: string;
+}
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const LoginScreen: React.FC = () => {
   const { login, register, isLoading } = useAuth();
-  const [isSigningIn, setIsSigningIn] = useState(false);
-  const [isRegistering, setIsRegistering] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(true);
-
-  // Form fields
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Error", "Please fill in all fields");
-      return;
+  const nameInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
+
+  const validate = () => {
+    const errors: FieldErrors = {};
+    const normalizedEmail = email.trim();
+
+    if (!normalizedEmail) {
+      errors.email = "Enter your email address.";
+    } else if (!emailPattern.test(normalizedEmail)) {
+      errors.email = "Enter a valid email address.";
     }
 
+    if (!password) {
+      errors.password = "Enter your password.";
+    } else if (!isLoginMode && password.length < 6) {
+      errors.password = "Use at least 6 characters.";
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSubmit = async () => {
+    setFormError(null);
+    if (!validate()) return;
+
+    setIsSubmitting(true);
     try {
-      setIsSigningIn(true);
-      const result = await login(email, password);
+      const normalizedEmail = email.trim().toLowerCase();
+      const result = isLoginMode
+        ? await login(normalizedEmail, password)
+        : await register(normalizedEmail, password, name.trim() || undefined);
 
       if (!result.success) {
-        Alert.alert("Login Error", result.error || "Failed to login");
+        setFormError(
+          result.error ||
+            (isLoginMode
+              ? "Could not sign in. Check your details and try again."
+              : "Could not create your account. Please try again."),
+        );
       }
     } catch (error) {
-      Alert.alert("Login Error", "Failed to login. Please try again.");
+      console.error("Authentication submit error:", error);
+      setFormError("Something went wrong. Please try again.");
     } finally {
-      setIsSigningIn(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleRegister = async () => {
-    if (!email || !password) {
-      Alert.alert("Error", "Please fill in all fields");
-      return;
-    }
-
-    if (password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters long");
-      return;
-    }
-
-    try {
-      setIsRegistering(true);
-      const result = await register(email, password, name || undefined);
-
-      if (!result.success) {
-        Alert.alert("Registration Error", result.error || "Failed to register");
-      }
-    } catch (error) {
-      Alert.alert(
-        "Registration Error",
-        "Failed to register. Please try again.",
-      );
-    } finally {
-      setIsRegistering(false);
-    }
+  const toggleMode = () => {
+    setIsLoginMode((current) => !current);
+    setFieldErrors({});
+    setFormError(null);
   };
 
   if (isLoading) {
-    return <LoadingSpinner text="Initializing..." />;
+    return <LoadingSpinner text="Initializing EchoOn" />;
   }
+
+  const submitLabel = isLoginMode ? "Sign In" : "Create Account";
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-background"
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1, backgroundColor: colors.background }}
+      behavior={process.env.EXPO_OS === "ios" ? "padding" : "height"}
     >
       <ScrollView
-        className="flex-1"
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
           flexGrow: 1,
           justifyContent: "center",
-          alignItems: "center",
-          paddingHorizontal: 32,
-          paddingVertical: 60,
+          paddingHorizontal: spacing["2xl"],
+          paddingVertical: spacing["3xl"],
+          gap: spacing["2xl"],
         }}
       >
-        {/* Logo Area */}
-        <View className="items-center mb-10">
-          <View className="w-24 h-24 bg-primary rounded-full justify-center items-center mb-6 shadow-lg">
-            <Text className="text-white text-5xl font-bold">E</Text>
+        <View style={{ alignItems: "center", gap: spacing.md }}>
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{
+              width: 88,
+              height: 88,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: radii.pill,
+              backgroundColor: colors.content,
+              boxShadow: "0 6px 16px rgba(88, 56, 31, 0.18)",
+            }}
+          >
+            <Text
+              style={{
+                color: colors.contentOnAccent,
+                fontFamily: fontFamilies.displayBold,
+                fontSize: 48,
+              }}
+            >
+              E
+            </Text>
           </View>
-          <Text className="text-3xl text-textDark mb-2 font-playfair-bold">
+          <Text
+            accessibilityRole="header"
+            style={{
+              color: colors.content,
+              fontFamily: fontFamilies.displayBold,
+              fontSize: 34,
+            }}
+          >
             EchoOn
           </Text>
-          <Text className="text-lg text-textDark text-center leading-6 font-inter-semibold font-semibold">
+          <Text
+            style={{
+              color: colors.contentMuted,
+              fontFamily: fontFamilies.bodySemibold,
+              fontSize: 17,
+              lineHeight: 24,
+              textAlign: "center",
+            }}
+          >
             Send messages to your future self
           </Text>
         </View>
 
-        {/* Form */}
-        <View className="w-full mb-10">
-          <Text className="text-2xl text-textDark text-center mb-6 font-playfair-bold">
+        <AppCard style={{ gap: spacing.lg }}>
+          <Text
+            accessibilityRole="header"
+            style={{
+              color: colors.content,
+              fontFamily: fontFamilies.displayBold,
+              fontSize: 26,
+              textAlign: "center",
+            }}
+          >
             {isLoginMode ? "Welcome Back" : "Create Account"}
           </Text>
 
-          <TextInput
-            className="bg-card rounded-xl px-4 py-4 mb-4 text-base text-textDark"
-            placeholder="Email"
+          <FormField
+            label="Email"
+            placeholder="you@example.com"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(value) => {
+              setEmail(value);
+              setFieldErrors((current) => ({ ...current, email: undefined }));
+              setFormError(null);
+            }}
+            error={fieldErrors.email}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
-            placeholderTextColor="#8AB6D6"
+            autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType="next"
+            editable={!isSubmitting}
+            onSubmitEditing={() =>
+              isLoginMode
+                ? passwordInputRef.current?.focus()
+                : nameInputRef.current?.focus()
+            }
           />
 
-          <TextInput
-            className="bg-card rounded-xl px-4 py-4 mb-6 text-base text-textDark"
-            placeholder="Password"
+          {!isLoginMode && (
+            <FormField
+              ref={nameInputRef}
+              label="Name"
+              hint="Optional"
+              placeholder="How should we address you?"
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
+              autoCorrect={false}
+              autoComplete="name"
+              textContentType="name"
+              returnKeyType="next"
+              editable={!isSubmitting}
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
+            />
+          )}
+
+          <FormField
+            ref={passwordInputRef}
+            label="Password"
+            hint={isLoginMode ? undefined : "At least 6 characters"}
+            placeholder="Enter your password"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(value) => {
+              setPassword(value);
+              setFieldErrors((current) => ({
+                ...current,
+                password: undefined,
+              }));
+              setFormError(null);
+            }}
+            error={fieldErrors.password}
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
-            placeholderTextColor="#8AB6D6"
+            autoComplete={isLoginMode ? "current-password" : "new-password"}
+            textContentType={isLoginMode ? "password" : "newPassword"}
+            returnKeyType="done"
+            editable={!isSubmitting}
+            onSubmitEditing={handleSubmit}
           />
 
-          <TouchableOpacity
-            className={`rounded-xl px-6 py-4 mb-4 shadow-md ${
-              isLoading ? "bg-gray-400" : "bg-primary"
-            }`}
-            onPress={isLoginMode ? handleLogin : handleRegister}
-            disabled={isLoading}
-          >
-            <Text className="text-white text-lg font-semibold text-center">
-              {isLoading ? "Loading..." : isLoginMode ? "Sign In" : "Sign Up"}
-            </Text>
-          </TouchableOpacity>
+          {formError && (
+            <View
+              accessibilityLiveRegion="assertive"
+              style={{
+                padding: spacing.md,
+                borderRadius: radii.sm,
+                borderCurve: "continuous",
+                backgroundColor: colors.dangerSurface,
+              }}
+            >
+              <Text
+                selectable
+                style={{
+                  color: colors.danger,
+                  fontFamily: fontFamilies.bodySemibold,
+                  fontSize: 14,
+                  lineHeight: 20,
+                }}
+              >
+                {formError}
+              </Text>
+            </View>
+          )}
 
-          <TouchableOpacity
-            className="items-center"
-            onPress={() => setIsLoginMode(!isLoginMode)}
-          >
-            <Text className="text-primary text-base font-medium">
-              {isLoginMode
-                ? "Don't have an account? Sign Up"
-                : "Already have an account? Sign In"}
-            </Text>
-          </TouchableOpacity>
+          <AppButton
+            label={submitLabel}
+            loading={isSubmitting}
+            onPress={handleSubmit}
+          />
+          <AppButton
+            label={
+              isLoginMode
+                ? "New to EchoOn? Create an account"
+                : "Already have an account? Sign in"
+            }
+            variant="quiet"
+            disabled={isSubmitting}
+            onPress={toggleMode}
+          />
+        </AppCard>
+
+        <View style={{ gap: spacing.md }}>
+          {[
+            "Write to your future self",
+            "Add images, audio, and links",
+            "Choose when your echo returns",
+          ].map((feature) => (
+            <View
+              key={feature}
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}
+            >
+              <View
+                accessibilityElementsHidden
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: radii.pill,
+                  backgroundColor: colors.content,
+                }}
+              />
+              <Text
+                style={{
+                  flex: 1,
+                  color: colors.content,
+                  fontFamily: fontFamilies.body,
+                  fontSize: 16,
+                }}
+              >
+                {feature}
+              </Text>
+            </View>
+          ))}
         </View>
 
-        {/* Features */}
-        <View className="w-full mb-10">
-          <View className="flex-row items-center mb-4">
-            <View className="w-2 h-2 bg-primary rounded-full mr-3"></View>
-            <Text className="text-textDark text-base flex-1 font-inter">
-              Send messages to your future self
-            </Text>
-          </View>
-          <View className="flex-row items-center mb-4">
-            <View className="w-2 h-2 bg-primary rounded-full mr-3"></View>
-            <Text className="text-textDark text-base flex-1 font-inter">
-              Add images, audio, and links
-            </Text>
-          </View>
-          <View className="flex-row items-center mb-4">
-            <View className="w-2 h-2 bg-primary rounded-full mr-3"></View>
-            <Text className="text-textDark text-base flex-1 font-inter">
-              Schedule delivery for any date
-            </Text>
-          </View>
-        </View>
-
-        {/* Terms */}
-        <Text className="text-textDark text-sm text-center leading-5 font-inter-semibold font-semibold">
-          By using EchoOn, you agree to our Terms of Service and Privacy Policy
+        <Text
+          style={{
+            color: colors.contentMuted,
+            fontFamily: fontFamilies.body,
+            fontSize: 13,
+            lineHeight: 18,
+            textAlign: "center",
+          }}
+        >
+          By continuing, you agree to the EchoOn terms and privacy policy.
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>

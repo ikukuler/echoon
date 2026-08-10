@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, Alert } from "react-native";
-import { Audio } from "expo-av";
+import React, { useEffect, useRef, useState } from "react";
+import { Text, View } from "react-native";
+import { Audio, AVPlaybackStatus } from "expo-av";
 import { HugeiconsIcon } from "@hugeicons/react-native";
 import {
   MusicNote03FreeIcons,
@@ -8,6 +8,8 @@ import {
   PlayIcon,
   StopIcon,
 } from "@hugeicons/core-free-icons";
+import { AppButton, AppCard, IconButton } from "./ui";
+import { colors, fontFamilies, radii, sizes, spacing } from "../theme";
 
 interface AudioPlayerProps {
   audioUri: string;
@@ -20,207 +22,280 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   duration = 0,
   fileName,
 }) => {
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isReady, setIsReady] = useState(false);
   const [currentPosition, setCurrentPosition] = useState(0);
-  const [totalDuration, setTotalDuration] = useState(0);
+  const [totalDuration, setTotalDuration] = useState(duration);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    loadAudio();
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
+    let active = true;
+    setIsLoading(true);
+    setIsReady(false);
+    setIsPlaying(false);
+    setCurrentPosition(0);
+    setTotalDuration(duration);
+    setError(null);
+
+    const handlePlaybackStatus = (status: AVPlaybackStatus) => {
+      if (!active) return;
+
+      if (!status.isLoaded) {
+        if (status.error) {
+          setError("This audio recording is unavailable.");
+          setIsReady(false);
+        }
+        return;
+      }
+
+      setIsPlaying(status.isPlaying);
+      setCurrentPosition((status.positionMillis ?? 0) / 1000);
+      setTotalDuration((status.durationMillis ?? duration * 1000) / 1000);
+      if (status.didJustFinish) {
+        setCurrentPosition(0);
+        setIsPlaying(false);
       }
     };
-  }, [audioUri]);
 
-  const loadAudio = async () => {
-    try {
-      setIsLoading(true);
+    const loadAudio = async () => {
+      try {
+        const previousSound = soundRef.current;
+        soundRef.current = null;
+        if (previousSound) await previousSound.unloadAsync();
 
-      if (sound) {
-        await sound.unloadAsync();
-      }
-
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: audioUri },
-        { shouldPlay: false },
-        onPlaybackStatusUpdate,
-      );
-
-      setSound(newSound);
-
-      // Get duration
-      const status = await newSound.getStatusAsync();
-      if (status.isLoaded) {
-        setTotalDuration(
-          status.durationMillis ? status.durationMillis / 1000 : 0,
+        const { sound, status } = await Audio.Sound.createAsync(
+          { uri: audioUri },
+          { shouldPlay: false, progressUpdateIntervalMillis: 250 },
+          handlePlaybackStatus,
         );
-      }
-    } catch (error) {
-      console.error("Failed to load audio:", error);
-      Alert.alert("Error", "Failed to load audio file");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  const onPlaybackStatusUpdate = (status: any) => {
-    if (status.isLoaded) {
-      setIsPlaying(status.isPlaying);
-      setCurrentPosition(
-        status.positionMillis ? status.positionMillis / 1000 : 0,
-      );
-      setTotalDuration(
-        status.durationMillis ? status.durationMillis / 1000 : 0,
-      );
-    }
-  };
+        if (!active) {
+          await sound.unloadAsync();
+          return;
+        }
+
+        soundRef.current = sound;
+        if (status.isLoaded) {
+          setTotalDuration((status.durationMillis ?? duration * 1000) / 1000);
+          setIsReady(true);
+        } else {
+          setError("This audio recording is unavailable.");
+        }
+      } catch (loadError) {
+        console.error("Failed to load audio:", loadError);
+        if (active) setError("This audio recording could not be loaded.");
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+
+    loadAudio();
+
+    return () => {
+      active = false;
+      const sound = soundRef.current;
+      soundRef.current = null;
+      if (sound) {
+        sound.unloadAsync().catch((unloadError) => {
+          console.error("Failed to unload audio:", unloadError);
+        });
+      }
+    };
+  }, [audioUri, duration, reloadKey]);
 
   const playAudio = async () => {
+    const sound = soundRef.current;
+    if (!sound) return;
+
     try {
-      if (sound) {
-        await sound.playAsync();
+      const status = await sound.getStatusAsync();
+      if (
+        status.isLoaded &&
+        status.durationMillis &&
+        status.positionMillis >= status.durationMillis
+      ) {
+        await sound.setPositionAsync(0);
       }
-    } catch (error) {
-      console.error("Failed to play audio:", error);
-      Alert.alert("Error", "Failed to play audio");
+      await sound.playAsync();
+    } catch (playError) {
+      console.error("Failed to play audio:", playError);
+      setError("Playback failed. Please try again.");
     }
   };
 
   const pauseAudio = async () => {
     try {
-      if (sound) {
-        await sound.pauseAsync();
-      }
-    } catch (error) {
-      console.error("Failed to pause audio:", error);
+      await soundRef.current?.pauseAsync();
+    } catch (pauseError) {
+      console.error("Failed to pause audio:", pauseError);
+      setError("Playback could not be paused.");
     }
   };
 
   const stopAudio = async () => {
     try {
-      if (sound) {
-        await sound.stopAsync();
-        await sound.setPositionAsync(0);
-      }
-    } catch (error) {
-      console.error("Failed to stop audio:", error);
+      const sound = soundRef.current;
+      if (!sound) return;
+      await sound.stopAsync();
+      await sound.setPositionAsync(0);
+      setCurrentPosition(0);
+      setIsPlaying(false);
+    } catch (stopError) {
+      console.error("Failed to stop audio:", stopError);
+      setError("Playback could not be stopped.");
     }
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const getProgressPercentage = () => {
-    if (totalDuration === 0) return 0;
-    return (currentPosition / totalDuration) * 100;
-  };
-
-  const seekTo = async (percentage: number) => {
-    try {
-      if (sound && totalDuration > 0) {
-        const newPosition = (percentage / 100) * totalDuration;
-        await sound.setPositionAsync(newPosition * 1000);
-      }
-    } catch (error) {
-      console.error("Failed to seek audio:", error);
-    }
-  };
+  const visibleDuration = totalDuration || duration;
+  const progress = visibleDuration
+    ? Math.min(Math.max(currentPosition / visibleDuration, 0), 1)
+    : 0;
+  const controlsDisabled = isLoading || !isReady || Boolean(error);
 
   return (
-    <View className="bg-card rounded-xl p-4 border border-gray-200">
-      {/* File Info */}
-      <View className="flex-row items-center mb-3">
-        <Text className="text-2xl mr-2">
-          <HugeiconsIcon
-            icon={MusicNote03FreeIcons}
-            size={24}
-            color="black"
-            strokeWidth={1.5}
-          />
-        </Text>
-        <View className="flex-1">
-          <Text className="text-sm font-medium text-gray-900" numberOfLines={1}>
+    <AppCard style={{ gap: spacing.md }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+        <HugeiconsIcon
+          icon={MusicNote03FreeIcons}
+          size={sizes.icon}
+          color={colors.content}
+          strokeWidth={1.5}
+        />
+        <View style={{ flex: 1, gap: spacing.xs }}>
+          <Text
+            numberOfLines={1}
+            style={{
+              color: colors.content,
+              fontFamily: fontFamilies.bodyBold,
+              fontSize: 15,
+            }}
+          >
             {fileName || "Audio Recording"}
           </Text>
-          <Text className="text-xs text-gray-500">
-            {formatTime(currentPosition)} /{" "}
-            {formatTime(totalDuration || duration)}
+          <Text
+            accessibilityLiveRegion="polite"
+            style={{
+              color: colors.contentMuted,
+              fontFamily: fontFamilies.body,
+              fontSize: 13,
+              fontVariant: ["tabular-nums"],
+            }}
+          >
+            {formatTime(currentPosition)} / {formatTime(visibleDuration)}
           </Text>
         </View>
       </View>
 
-      {/* Progress Bar */}
-      <View className="bg-gray-200 rounded-full h-2 mb-3">
+      <View
+        accessible
+        accessibilityRole="progressbar"
+        accessibilityLabel="Audio playback progress"
+        accessibilityValue={{
+          min: 0,
+          max: Math.max(Math.round(visibleDuration), 1),
+          now: Math.round(currentPosition),
+          text: `${formatTime(currentPosition)} of ${formatTime(visibleDuration)}`,
+        }}
+        style={{
+          height: 8,
+          overflow: "hidden",
+          borderRadius: radii.pill,
+          backgroundColor: colors.disabledSurface,
+        }}
+      >
         <View
-          className="bg-blue-500 h-2 rounded-full"
-          style={{ width: `${getProgressPercentage()}%` }}
+          style={{
+            width: `${progress * 100}%`,
+            height: "100%",
+            borderRadius: radii.pill,
+            backgroundColor: colors.content,
+          }}
         />
       </View>
 
-      {/* Controls */}
-      <View className="flex-row justify-center items-center space-x-4 gap-4">
-        <TouchableOpacity
-          className="bg-echo rounded-full w-12 h-12 justify-center items-center"
-          onPress={stopAudio}
-          disabled={isLoading}
-        >
-          <Text className="text-gray-700 text-lg">
-            <HugeiconsIcon
-              icon={StopIcon}
-              size={24}
-              color="white"
-              strokeWidth={1.5}
-            />
+      {error ? (
+        <View style={{ gap: spacing.md }}>
+          <Text
+            accessibilityLiveRegion="polite"
+            selectable
+            style={{
+              color: colors.danger,
+              fontFamily: fontFamilies.bodySemibold,
+              fontSize: 14,
+              textAlign: "center",
+            }}
+          >
+            {error}
           </Text>
-        </TouchableOpacity>
-
-        {isPlaying ? (
-          <TouchableOpacity
-            className="bg-echo rounded-full w-12 h-12 justify-center items-center"
-            onPress={pauseAudio}
-            disabled={isLoading}
-            activeOpacity={0.7}
-          >
-            <Text className="text-white text-lg">
+          <AppButton
+            label="Try Again"
+            variant="quiet"
+            onPress={() => setReloadKey((key) => key + 1)}
+          />
+        </View>
+      ) : (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: spacing.lg,
+          }}
+        >
+          <IconButton
+            accessibilityLabel="Stop audio"
+            accessibilityHint="Stops playback and returns to the beginning"
+            disabled={controlsDisabled || currentPosition === 0}
+            onPress={stopAudio}
+            icon={
               <HugeiconsIcon
-                icon={PauseIcon}
-                size={24}
-                color="white"
+                icon={StopIcon}
+                size={sizes.icon}
+                color={colors.content}
                 strokeWidth={1.5}
               />
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            className="bg-echo rounded-full w-12 h-12 justify-center items-center"
-            onPress={playAudio}
-            disabled={isLoading}
-            activeOpacity={0.7}
-          >
-            <Text className="text-white text-lg">
+            }
+          />
+          <IconButton
+            accessibilityLabel={isPlaying ? "Pause audio" : "Play audio"}
+            selected={isPlaying}
+            disabled={controlsDisabled}
+            onPress={isPlaying ? pauseAudio : playAudio}
+            icon={
               <HugeiconsIcon
-                icon={PlayIcon}
-                size={24}
-                color="white"
+                icon={isPlaying ? PauseIcon : PlayIcon}
+                size={sizes.icon}
+                color={colors.content}
                 strokeWidth={1.5}
-                activeOpacity={0.7}
               />
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {isLoading && (
-        <View className="absolute inset-0 bg-white/80 justify-center items-center rounded-xl">
-          <Text className="text-gray-600">Loading...</Text>
+            }
+          />
         </View>
       )}
-    </View>
+
+      {isLoading && (
+        <Text
+          accessibilityLiveRegion="polite"
+          style={{
+            color: colors.contentMuted,
+            fontFamily: fontFamilies.body,
+            fontSize: 13,
+            textAlign: "center",
+          }}
+        >
+          Loading audio…
+        </Text>
+      )}
+    </AppCard>
   );
 };
+
+function formatTime(seconds: number) {
+  const safeSeconds = Number.isFinite(seconds) ? Math.max(seconds, 0) : 0;
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainder = Math.floor(safeSeconds % 60);
+  return `${minutes}:${remainder.toString().padStart(2, "0")}`;
+}

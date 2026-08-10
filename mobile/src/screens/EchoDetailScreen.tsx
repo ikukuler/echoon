@@ -1,311 +1,251 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  Dimensions,
   Alert,
-  Modal,
-  StatusBar,
+  Image,
   Linking,
+  Modal,
+  ScrollView,
+  StatusBar,
+  Text,
+  View,
+  useWindowDimensions,
 } from "react-native";
-import { useAuth } from "../hooks/useAuth";
-import { Echo, EchoPart } from "../types";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { RootStackParamList, Echo } from "../types";
 import { formatDate, isFutureDate } from "../utils/dateUtils";
-import { AudioPlayer } from "../components/AudioPlayer";
-import { HugeiconsIcon } from "@hugeicons/react-native";
-import { ArrowLeftIcon, Link01Icon } from "@hugeicons/core-free-icons";
 import { apiService } from "../services/api";
+import { EchoPartRenderer } from "../components/echo/echo-part-renderer";
+import {
+  AppCard,
+  FeedbackState,
+  IconButton,
+  ScreenHeader,
+  StatusBadge,
+} from "../components/ui";
+import { colors, fontFamilies, spacing } from "../theme";
 
-interface EchoDetailScreenProps {
-  navigation: any;
-  route: {
-    params: {
-      echo?: Echo;
-      echoId?: string;
-      fromNotification?: boolean;
-    };
-  };
-}
-
-const { width: screenWidth } = Dimensions.get("window");
+type EchoDetailScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  "EchoDetail"
+>;
 
 export const EchoDetailScreen: React.FC<EchoDetailScreenProps> = ({
   navigation,
   route,
 }) => {
-  console.log("EchoDetailScreen loaded with params:", route.params);
-
+  const params = route.params ?? {};
+  const { width, height } = useWindowDimensions();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [isImageModalVisible, setIsImageModalVisible] = useState(false);
-  const [echo, setEcho] = useState<Echo | null>(route.params.echo || null);
-  const [isLoading, setIsLoading] = useState(!route.params.echo);
-  const { user } = useAuth();
+  const [echo, setEcho] = useState<Echo | null>(params.echo ?? null);
+  const [isLoading, setIsLoading] = useState(Boolean(params.echoId && !params.echo));
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Загружаем эхо по ID, если он передан
-  React.useEffect(() => {
-    if (route.params.echoId && !route.params.echo) {
-      const loadEcho = async () => {
-        try {
-          setIsLoading(true);
-          console.log("Loading echo with ID:", route.params.echoId);
+  const loadEcho = useCallback(async () => {
+    if (!params.echoId) return;
 
-          const response = await apiService.getEcho(route.params.echoId!);
-          if (response.success && response.data) {
-            setEcho(response.data);
-          } else {
-            console.error("Failed to load echo:", response.error);
-          }
-        } catch (error) {
-          console.error("Error loading echo:", error);
-        } finally {
-          setIsLoading(false);
-        }
-      };
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const response = await apiService.getEcho(params.echoId);
+      if (response.success && response.data) {
+        setEcho(response.data);
+      } else {
+        setEcho(null);
+        setLoadError(response.error || "This echo could not be loaded.");
+      }
+    } catch (error) {
+      console.error("Error loading echo:", error);
+      setEcho(null);
+      setLoadError("This echo could not be loaded. Check your connection.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [params.echoId]);
+
+  useEffect(() => {
+    if (params.echo) {
+      setEcho(params.echo);
+      setLoadError(null);
+      setIsLoading(false);
+    } else if (params.echoId) {
       loadEcho();
     }
-  }, [route.params.echoId]);
+  }, [loadEcho, params.echo]);
 
-  // Проверяем, что params существуют
-  if (!route.params || (!route.params.echo && !route.params.echoId)) {
-    console.error("No echo data or ID provided to EchoDetailScreen");
+  const handleLinkPress = async (url: string) => {
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
+        Alert.alert("Unsupported link", "Only web links can be opened.");
+        return;
+      }
+
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) {
+        Alert.alert("Cannot open link", parsedUrl.hostname);
+        return;
+      }
+
+      await Linking.openURL(url);
+    } catch (error) {
+      console.error("Could not open echo link:", error);
+      Alert.alert("Invalid link", "This link is not a valid web address.");
+    }
+  };
+
+  if (!params.echo && !params.echoId) {
     return (
-      <View className="flex-1 bg-background">
-        <View className="bg-header px-5 pt-16 pb-5 shadow-sm">
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            className="py-2 px-3 rounded-lg bg-echo self-start mb-4"
-          >
-            <Text className="text-textDark text-base font-medium">
-              <HugeiconsIcon
-                icon={ArrowLeftIcon}
-                size={24}
-                color="black"
-                strokeWidth={1.5}
-              />
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <View className="flex-1 justify-center items-center">
-          <Text className="text-accentSecondary">No echo data found</Text>
-        </View>
-      </View>
+      <DetailStateFrame title="Echo unavailable" onBack={navigation.goBack}>
+        <FeedbackState
+          title="No echo selected"
+          message="Return to your echoes and choose one to view."
+          actionLabel="Go Back"
+          onAction={navigation.goBack}
+        />
+      </DetailStateFrame>
     );
   }
 
   if (isLoading) {
     return (
-      <View className="flex-1 bg-background justify-center items-center">
-        <Text className="text-accentSecondary">Loading echo...</Text>
-      </View>
+      <DetailStateFrame title="Echo Details" onBack={navigation.goBack}>
+        <FeedbackState title="Loading echo" loading />
+      </DetailStateFrame>
     );
   }
 
-  if (!echo) {
+  if (loadError || !echo) {
     return (
-      <View className="flex-1 bg-background">
-        <View className="bg-header px-5 pt-16 pb-5 shadow-sm">
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            className="py-2 px-3 rounded-lg bg-echo self-start mb-4"
-          >
-            <Text className="text-textDark text-base font-medium">
-              <HugeiconsIcon
-                icon={ArrowLeftIcon}
-                size={24}
-                color="black"
-                strokeWidth={1.5}
-              />
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <View className="flex-1 justify-center items-center">
-          <Text className="text-accentSecondary">Echo not found</Text>
-        </View>
-      </View>
+      <DetailStateFrame title="Echo unavailable" onBack={navigation.goBack}>
+        <FeedbackState
+          title="Could not load echo"
+          message={loadError ?? "This echo was not found."}
+          actionLabel={params.echoId ? "Try Again" : "Go Back"}
+          onAction={params.echoId ? loadEcho : navigation.goBack}
+        />
+      </DetailStateFrame>
     );
   }
 
-  const openImageModal = (imageUrl: string) => {
-    setSelectedImage(imageUrl);
-    setIsImageModalVisible(true);
-  };
-
-  const closeImageModal = () => {
-    setIsImageModalVisible(false);
-    setSelectedImage(null);
-  };
-
-  const handleLinkPress = async (url: string) => {
-    const supported = await Linking.canOpenURL(url);
-    if (supported) {
-      await Linking.openURL(url);
-    } else {
-      Alert.alert(`Could not open link: ${url}`);
-    }
-  };
-
-  const renderPart = (part: EchoPart, index: number) => {
-    switch (part.type) {
-      case "text":
-        return (
-          <View key={part.id} className="bg-card rounded-xl p-5 shadow-sm">
-            <Text className="text-2xl leading-8 text-textDark font-playfair-bold">
-              {part.content}
-            </Text>
-          </View>
-        );
-
-      case "image":
-        return (
-          <TouchableOpacity
-            key={part.id}
-            className="bg-card rounded-xl p-2 shadow-sm relative"
-            onPress={() => openImageModal(part.content)}
-            activeOpacity={0.9}
-          >
-            <Image
-              source={{ uri: part.content }}
-              className="w-full rounded-lg"
-              style={{ height: (screenWidth - 56) * 0.75 }}
-              resizeMode="contain"
-              onError={() => {
-                console.log(`Failed to load image: ${part.content}`);
-              }}
-            />
-            <View className="absolute bottom-2 right-2 bg-black/70 px-2 py-1 rounded-xl">
-              <Text className="text-white text-xs font-medium">
-                Tap to view full size
-              </Text>
-            </View>
-          </TouchableOpacity>
-        );
-
-      case "audio":
-        return (
-          <View key={part.id} className="bg-card rounded-xl p-4 shadow-sm">
-            <AudioPlayer audioUri={part.content} fileName="Audio Recording" />
-          </View>
-        );
-
-      case "link":
-        return (
-          <TouchableOpacity
-            key={part.id}
-            className="bg-card rounded-xl p-5 flex-row items-center shadow-sm"
-            onPress={() => handleLinkPress(part.content)}
-            activeOpacity={0.8}
-          >
-            <Text className="text-2xl mr-3">
-              <HugeiconsIcon
-                icon={Link01Icon}
-                size={24}
-                strokeWidth={1.5}
-                className="mr-2"
-              />
-            </Text>
-            <Text className="text-base text-blue-500 flex-1">
-              {part.content}
-            </Text>
-          </TouchableOpacity>
-        );
-
-      default:
-        return null;
-    }
-  };
+  const pending = isFutureDate(echo.return_at);
+  const imageHeight = Math.min(Math.max(width - 56, 240) * 0.75, 420);
 
   return (
-    <View className="flex-1 bg-background">
-      {/* Header */}
-      <View className="bg-header px-5 pt-16 pb-5 shadow-sm flex-row justify-between items-center">
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          className="py-2 px-3 rounded-lg bg-echo self-start mb-4"
-        >
-          <Text className="text-textDark text-base font-medium">
-            <HugeiconsIcon
-              icon={ArrowLeftIcon}
-              size={24}
-              color="black"
-              strokeWidth={1.5}
-            />
-          </Text>
-        </TouchableOpacity>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScreenHeader title="Echo Details" onBack={navigation.goBack} />
 
-        <View className="flex-row justify-between items-center">
-          <Text className="text-4xl text-textDark font-playfair-bold">
-            Echo Details
-          </Text>
-        </View>
-        <View
-          className={`px-3 py-1.5 rounded-2xl ${
-            isFutureDate(echo.return_at) ? "bg-echo" : "bg-accentSecondary"
-          }`}
-        >
-          <Text
-            className={`text-sm font-semibold ${
-              isFutureDate(echo.return_at) ? "text-textDark" : "text-white"
-            }`}
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{
+          padding: spacing.xl,
+          paddingBottom: spacing["3xl"],
+          gap: spacing.lg,
+        }}
+      >
+        <AppCard style={{ gap: spacing.sm }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: spacing.md,
+            }}
           >
-            {isFutureDate(echo.return_at) ? "Pending" : "Delivered"}
-          </Text>
-        </View>
-      </View>
+            <View style={{ flex: 1, gap: spacing.xs }}>
+              <Text
+                style={{
+                  color: colors.contentMuted,
+                  fontFamily: fontFamilies.body,
+                  fontSize: 14,
+                }}
+              >
+                Will arrive
+              </Text>
+              <Text
+                selectable
+                style={{
+                  color: colors.content,
+                  fontFamily: fontFamilies.bodyBold,
+                  fontSize: 18,
+                }}
+              >
+                {formatDate(echo.return_at)}
+              </Text>
+            </View>
+            <StatusBadge
+              label={pending ? "Pending" : "Delivered"}
+              tone={pending ? "pending" : "delivered"}
+            />
+          </View>
+        </AppCard>
 
-      {/* Content */}
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: 20 }}>
-        {/* Date Info */}
-        <View className="bg-card rounded-xl p-4 mb-5 shadow-sm ">
-          <Text className="text-sm text-accentSecondary mb-1">
-            Will arrive:
-          </Text>
-          <Text className="text-lg font-semibold text-textDark">
-            {formatDate(echo.return_at)}
-          </Text>
-        </View>
+        {echo.parts?.map((part) => (
+          <EchoPartRenderer
+            key={part.id}
+            part={part}
+            imageHeight={imageHeight}
+            onOpenImage={setSelectedImage}
+            onOpenLink={handleLinkPress}
+          />
+        ))}
 
-        {/* Echo Parts */}
-        <View className="space-y-4 bg-card">
-          {echo.parts?.map((part, index) => renderPart(part, index))}
-        </View>
-
-        {/* Created Date */}
-        <View className="mt-5 pt-5 ">
-          <Text className="text-sm text-accentSecondary text-center">
-            Created: {formatDate(echo.created_at)}
-          </Text>
-        </View>
+        <Text
+          selectable
+          style={{
+            paddingTop: spacing.sm,
+            color: colors.contentMuted,
+            fontFamily: fontFamilies.body,
+            fontSize: 13,
+            textAlign: "center",
+          }}
+        >
+          Created {formatDate(echo.created_at)}
+        </Text>
       </ScrollView>
 
-      {/* Full Screen Image Modal */}
       <Modal
-        visible={isImageModalVisible}
-        transparent={true}
+        visible={Boolean(selectedImage)}
+        transparent
         animationType="fade"
-        onRequestClose={closeImageModal}
+        onRequestClose={() => setSelectedImage(null)}
       >
-        <StatusBar hidden={true} />
-        <View className="flex-1 bg-black/90 justify-center items-center">
-          <TouchableOpacity
-            className="absolute top-12 right-5 w-10 h-10 rounded-full bg-white/20 justify-center items-center z-10"
-            onPress={closeImageModal}
-            activeOpacity={0.8}
-          >
-            <Text className="text-white text-xl font-bold">✕</Text>
-          </TouchableOpacity>
-
+        <StatusBar hidden />
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(0, 0, 0, 0.92)",
+          }}
+        >
+          <IconButton
+            accessibilityLabel="Close full-screen image"
+            onPress={() => setSelectedImage(null)}
+            icon={
+              <Text
+                style={{
+                  color: colors.contentOnAccent,
+                  fontFamily: fontFamilies.bodyBold,
+                  fontSize: 22,
+                }}
+              >
+                ×
+              </Text>
+            }
+            style={{
+              position: "absolute",
+              top: spacing["2xl"],
+              right: spacing.xl,
+              zIndex: 1,
+              backgroundColor: "rgba(255, 255, 255, 0.2)",
+            }}
+          />
           {selectedImage && (
             <Image
+              accessibilityLabel="Full-screen echo image"
               source={{ uri: selectedImage }}
-              className="w-full"
-              style={{ height: screenWidth * 1.5 }}
               resizeMode="contain"
-              onError={() => {
-                console.log(`Failed to load modal image: ${selectedImage}`);
-              }}
+              style={{ width, height }}
             />
           )}
         </View>
@@ -313,3 +253,20 @@ export const EchoDetailScreen: React.FC<EchoDetailScreenProps> = ({
     </View>
   );
 };
+
+function DetailStateFrame({
+  title,
+  onBack,
+  children,
+}: {
+  title: string;
+  onBack: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScreenHeader title={title} onBack={onBack} />
+      {children}
+    </View>
+  );
+}

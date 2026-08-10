@@ -40,7 +40,7 @@ const variantStyles: Record<
   },
   quiet: {
     background: "transparent",
-    pressed: colors.dangerSurface,
+    pressed: colors.surfaceElevated,
     content: colors.content,
     border: colors.border,
   },

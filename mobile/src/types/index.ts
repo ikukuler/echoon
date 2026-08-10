@@ -93,7 +93,13 @@ export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
   CreateEcho: undefined;
-  EchoDetail: { echo: Echo };
+  EchoDetail:
+    | {
+        echo?: Echo;
+        echoId?: string;
+        fromNotification?: boolean;
+      }
+    | undefined;
   UserSettings: undefined;
   Profile: undefined;
 };
