@@ -198,7 +198,6 @@ async function sendPushNotification(
         priority: "high" as const,
         notification: {
           sound: "default",
-          clickAction: "OPEN_ECHO_DETAIL",
         },
       },
       apns: {

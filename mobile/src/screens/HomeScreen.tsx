@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Linking,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../hooks/useAuth";
 import { apiService } from "../services/api";
 import { Echo } from "../types";
@@ -123,9 +124,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   }, [hasMore, isLoadingMore, isRefreshing, loadEchoes]);
 
-  useEffect(() => {
-    loadEchoes(true); // Загружаем первую страницу при монтировании
-  }, []);
+  // Перезагружаем список при каждом возврате на экран (например, после создания echo)
+  useFocusEffect(
+    useCallback(() => {
+      loadEchoes(true);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
 
   if (isLoading) {
     return <LoadingSpinner text="Loading your echoes..." />;

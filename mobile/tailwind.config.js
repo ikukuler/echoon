@@ -8,14 +8,32 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Новая палитра цветов
-        primary: "#58381f",          // Основной цвет (88,56,31)
-        background: "#ecd3b2",       // Фоновый цвет (236,211,178)
-        echo: "#efb56b",             // Акцент "эхо" (239,181,107)
-        textDark: "#58381f",         // Основной цвет текста (88,56,31)
-        accentSecondary: "#b58756",  // Вторичный акцент (181,135,86)
-        darkModeBg: "#58381f",       // Тёмный фон (88,56,31)
-        sepiaGold: "#d16014",        // Золото сепии (209,96,20)
+        // Семантические токены. Legacy-имена ниже остаются на время миграции.
+        primary: "#58381f",
+        background: "#ecd3b2",
+        surface: "#fff5ee",
+        surfaceElevated: "#f8f4f0",
+        content: "#58381f",
+        contentMuted: "#765433",
+        contentOnAccent: "#f8f4f0",
+        accent: "#efb56b",
+        accentPressed: "#d99a4e",
+        border: "#c9a77e",
+        danger: "#b42318",
+        dangerPressed: "#8f1c13",
+        dangerSurface: "#fee4e2",
+        success: "#357a38",
+        successSurface: "#e5f4e6",
+        warning: "#9a5800",
+        warningSurface: "#fff0d5",
+        scrim: "rgba(0, 0, 0, 0.55)",
+
+        // Legacy aliases used by screens that have not been migrated yet.
+        echo: "#efb56b",
+        textDark: "#58381f",
+        accentSecondary: "#765433",
+        darkModeBg: "#58381f",
+        sepiaGold: "#d16014",
         
         // Дополнительные оттенки для градиентов и состояний
         primaryLight: "#b58756",
@@ -27,7 +45,7 @@ module.exports = {
         
         // Замена белого цвета на более нежный оттенок
         white: "#f8f4f0", // Чуть светлее фонового цвета
-        card: "#fff5ee", // Цвет для карточек (замена белого)
+        card: "#fff5ee", // Alias for surface.
         header: "#f0e6d8", // Цвет для хедеров (немного темнее карточек)
       },
       fontFamily: {
@@ -50,4 +68,4 @@ module.exports = {
     },
   },
   plugins: [],
-}; 
+};

@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Switch,
-  Alert,
-  ScrollView,
-} from "react-native";
-import { useAuth } from "../hooks/useAuth";
-import { apiService } from "../services/api";
+import React, { useEffect, useState } from "react";
+import { Alert, ScrollView, Switch, Text, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { HugeiconsIcon } from "@hugeicons/react-native";
-import { ArrowLeftIcon } from "@hugeicons/core-free-icons";
+import { useAuth } from "../hooks/useAuth";
+import {
+  AppButton,
+  AppCard,
+  FeedbackState,
+  ScreenHeader,
+  SectionHeading,
+} from "../components/ui";
+import { colors, fontFamilies, radii, spacing } from "../theme";
 
 interface UserSettingsScreenProps {
-  navigation: any;
+  navigation: {
+    goBack: () => void;
+  };
 }
 
 const SETTINGS_KEY = "user_settings";
@@ -23,183 +23,233 @@ interface UserSettings {
   enableDateSelection: boolean;
 }
 
+const defaultSettings: UserSettings = {
+  enableDateSelection: false,
+};
+
 export const UserSettingsScreen: React.FC<UserSettingsScreenProps> = ({
   navigation,
 }) => {
   const { user, logout } = useAuth();
-  const [settings, setSettings] = useState<UserSettings>({
-    enableDateSelection: false,
-  });
+  const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    loadSettings();
-  }, []);
+  const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadSettings = async () => {
+    setIsLoading(true);
+    setLoadError(null);
+
     try {
       const savedSettings = await AsyncStorage.getItem(SETTINGS_KEY);
-      console.log("Loaded settings from storage:", savedSettings);
-      if (savedSettings) {
-        const parsedSettings = JSON.parse(savedSettings);
-        console.log("Parsed settings:", parsedSettings);
-        setSettings(parsedSettings);
-      } else {
-        console.log("No saved settings found, using defaults");
+
+      if (!savedSettings) {
+        setSettings(defaultSettings);
+        return;
       }
+
+      const parsedSettings: unknown = JSON.parse(savedSettings);
+      if (
+        typeof parsedSettings !== "object" ||
+        parsedSettings === null ||
+        typeof (parsedSettings as UserSettings).enableDateSelection !== "boolean"
+      ) {
+        throw new Error("Stored settings have an invalid shape");
+      }
+
+      setSettings(parsedSettings as UserSettings);
     } catch (error) {
       console.error("Error loading settings:", error);
+      setLoadError("Your settings could not be loaded. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
   const saveSettings = async (newSettings: UserSettings) => {
+    if (isSaving) return;
+
+    const previousSettings = settings;
+    setSettings(newSettings);
+    setIsSaving(true);
+
     try {
-      console.log("Saving settings:", newSettings);
       await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
-      setSettings(newSettings);
-      console.log("Settings saved successfully");
     } catch (error) {
       console.error("Error saving settings:", error);
-      Alert.alert("Error", "Failed to save settings");
+      setSettings(previousSettings);
+      Alert.alert("Could not save settings", "Your previous setting was restored.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleToggleDateSelection = (value: boolean) => {
-    console.log("Toggle date selection to:", value);
     saveSettings({ ...settings, enableDateSelection: value });
   };
 
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Sign Out",
         style: "destructive",
-        onPress: () => logout(),
+        onPress: logout,
       },
     ]);
   };
 
   if (isLoading) {
+    return <FeedbackState title="Loading settings" loading />;
+  }
+
+  if (loadError) {
     return (
-      <View className="flex-1 bg-gray-50 justify-center items-center">
-        <Text className="text-accentSecondary font-inter-bold font-bold">
-          Loading settings...
-        </Text>
-      </View>
+      <FeedbackState
+        title="Settings unavailable"
+        message={loadError}
+        actionLabel="Try Again"
+        onAction={loadSettings}
+      />
     );
   }
 
   return (
-    <View className="flex-1 bg-background">
-      {/* Header */}
-      <View className="bg-header px-5 pt-16 pb-5 shadow-sm flex-row flex-shrink-0 items-center">
-        <View className="flex-row justify-between items-center">
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            className="py-2 px-3 rounded-lg bg-echo"
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScreenHeader title="Settings" onBack={navigation.goBack} />
+
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{
+          padding: spacing.xl,
+          paddingBottom: spacing["3xl"],
+          gap: spacing["2xl"],
+        }}
+      >
+        <AppCard style={{ gap: spacing.lg }}>
+          <SectionHeading>Echo Creation</SectionHeading>
+
+          <View
+            style={{
+              minHeight: 56,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.lg,
+            }}
           >
-            <Text className="text-textDark font-medium">
-              <HugeiconsIcon
-                icon={ArrowLeftIcon}
-                size={24}
-                color="black"
-                strokeWidth={1.5}
-              />
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <View className="flex-1 items-center flex-shrink-0 py-2">
-          <Text className="text-4xl text-textDark leading-10 font-playfair-bold">
-            Settings
-          </Text>
-        </View>
-      </View>
-
-      {/* Content */}
-      <ScrollView className="flex-1">
-        <View className="p-5">
-          {/* Echo Creation Settings */}
-          <View className="bg-card rounded-xl p-5 mb-6 shadow-sm ">
-            <Text className="text-2xl text-textDark mb-4 font-playfair-bold">
-              Echo Creation
-            </Text>
-
-            {/* Date Selection Toggle */}
-            <View className="flex-row justify-between items-center py-3 ">
-              <View className="flex-1">
-                <Text className="text-base text-textDark font-inter-bold font-bold">
-                  Choose Return Date
-                </Text>
-                <Text className="text-sm text-accentSecondary mt-1">
-                  When creating an echo, let me choose when it should be
-                  delivered
-                </Text>
-              </View>
-              <Switch
-                value={settings.enableDateSelection}
-                onValueChange={handleToggleDateSelection}
-                trackColor={{ false: "#e5e7eb", true: "#58381f" }}
-                thumbColor={
-                  settings.enableDateSelection ? "#f8f4f0" : "#f3f4f6"
-                }
-              />
-            </View>
-
-            {/* Explanation */}
-            <View className="mt-4 p-3 bg-echo rounded-lg ">
-              <Text className="text-sm text-textDark">
-                {settings.enableDateSelection
-                  ? "✅ You will be able to choose when your echo should be delivered"
-                  : "🎲 Your echo will be delivered at a random time within the next year"}
+            <View style={{ flex: 1, gap: spacing.xs }}>
+              <Text
+                style={{
+                  color: colors.content,
+                  fontFamily: fontFamilies.bodyBold,
+                  fontSize: 16,
+                }}
+              >
+                Choose Return Date
+              </Text>
+              <Text
+                style={{
+                  color: colors.contentMuted,
+                  fontFamily: fontFamilies.body,
+                  fontSize: 14,
+                  lineHeight: 20,
+                }}
+              >
+                When creating an echo, let me choose when it should be delivered
               </Text>
             </View>
+            <Switch
+              accessibilityLabel="Choose Return Date"
+              accessibilityHint="Controls whether you choose a delivery date when creating an echo"
+              value={settings.enableDateSelection}
+              onValueChange={handleToggleDateSelection}
+              disabled={isSaving}
+              trackColor={{
+                false: colors.disabledSurface,
+                true: colors.content,
+              }}
+              thumbColor={colors.surfaceElevated}
+            />
           </View>
 
-          {/* Account Settings */}
-          <View className="bg-card rounded-xl p-5 mb-6 shadow-sm ">
-            <Text className="text-2xl text-textDark mb-4 font-playfair-bold">
-              Account
-            </Text>
-
-            {/* User Info */}
-            <View className="py-3 ">
-              <Text className="text-sm text-accentSecondary">Email</Text>
-              <Text className="text-base text-textDark font-inter-bold font-bold">
-                {user?.email}
-              </Text>
-            </View>
-
-            <View className="py-3 ">
-              <Text className="text-sm text-accentSecondary">Name</Text>
-              <Text className="text-base text-textDark font-inter-bold font-bold">
-                {user?.name || "Not set"}
-              </Text>
-            </View>
-
-            <View className="py-3">
-              <Text className="text-sm text-accentSecondary">Member since</Text>
-              <Text className="text-base text-textDark font-inter-bold font-bold">
-                {user?.created_at
-                  ? new Date(user.created_at).toLocaleDateString()
-                  : "Unknown"}
-              </Text>
-            </View>
-          </View>
-
-          {/* Sign Out Button */}
-          <TouchableOpacity
-            onPress={handleSignOut}
-            className="bg-red-500 py-4 px-6 rounded-xl shadow-sm "
+          <View
+            accessibilityLiveRegion="polite"
+            style={{
+              padding: spacing.md,
+              borderRadius: radii.sm,
+              borderCurve: "continuous",
+              backgroundColor: colors.accent,
+            }}
           >
-            <Text className="text-white text-lg font-bold text-center">
-              Sign Out
+            <Text
+              style={{
+                color: colors.content,
+                fontFamily: fontFamilies.body,
+                fontSize: 14,
+                lineHeight: 20,
+              }}
+            >
+              {isSaving
+                ? "Saving your preference…"
+                : settings.enableDateSelection
+                  ? "You will choose when each echo should be delivered."
+                  : "Each echo will arrive at a random time within the next year."}
             </Text>
-          </TouchableOpacity>
-        </View>
+          </View>
+        </AppCard>
+
+        <AppCard style={{ gap: spacing.lg }}>
+          <SectionHeading>Account</SectionHeading>
+
+          <AccountField label="Email" value={user?.email ?? "Unknown"} />
+          <AccountField label="Name" value={user?.name || "Not set"} />
+          <AccountField
+            label="Member since"
+            value={
+              user?.created_at
+                ? new Date(user.created_at).toLocaleDateString()
+                : "Unknown"
+            }
+          />
+        </AppCard>
+
+        <AppButton
+          label="Sign Out"
+          variant="danger"
+          onPress={handleSignOut}
+          accessibilityHint="Signs you out after confirmation"
+        />
       </ScrollView>
     </View>
   );
 };
+
+function AccountField({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={{ gap: spacing.xs }}>
+      <Text
+        style={{
+          color: colors.contentMuted,
+          fontFamily: fontFamilies.body,
+          fontSize: 14,
+        }}
+      >
+        {label}
+      </Text>
+      <Text
+        selectable
+        style={{
+          color: colors.content,
+          fontFamily: fontFamilies.bodyBold,
+          fontSize: 16,
+        }}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
