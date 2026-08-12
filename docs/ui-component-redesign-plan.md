@@ -1,5 +1,59 @@
 # План развития компонентного дизайна EchoOn
 
+> Последнее обновление статуса: 13 августа 2026.
+>
+> Легенда: ✅ выполнено, 🟡 выполнено частично, ⬜ не начато.
+
+## 0. Статус выполнения
+
+| Этап | Статус | Что уже сделано | Что осталось |
+| --- | --- | --- | --- |
+| 0. Визуальный baseline | 🟡 | Android-приложение запускалось на физическом устройстве; проверены сборка бандла и отсутствие фатальных runtime-ошибок | Системно снять безопасные screenshots всех состояний; проверить TalkBack, увеличенный шрифт, маленький экран и tablet |
+| 1. Токены и шрифты | ✅ | Создан `mobile/src/theme/`; введены семантические цвета, spacing, radii, sizes и typography; исправлен Playfair Bold в `app.json`, hook и Tailwind | Выполнить инструментальную проверку контраста и визуальное сравнение regular/bold на Android и iOS |
+| 2. Базовый UI-слой | 🟡 | Реализованы `AppButton`, `IconButton`, `ScreenHeader`, `AppCard`, `StatusBadge`, `FormField`, `FeedbackState`, `SectionHeading` и barrel export | Добавить `AppScreen`; добавить автоматические accessibility/interaction tests |
+| 3. Простые экраны | ✅ | Login, Settings и Echo Detail переведены на общие компоненты; части Echo вынесены в renderer; fullscreen image получил доступное закрытие | Ручной TalkBack/VoiceOver QA, keyboard flow и проверка системной Back-кнопки Android |
+| 4. Home и EchoCard | ✅ | `FlatList`, refresh, pagination guard, дедупликация, initial/footer errors, memoized `EchoCard`, отдельные link/audio/open targets, image fallback; debug action ограничен `__DEV__` | Добавить interaction-тесты и вручную проверить быстрые refresh/load-more и длинные данные |
+| 5. AudioPlayer/Recorder | 🟡 | Оба компонента используют общие токены/controls; добавлены loading/error/progress accessibility states; recorder обрабатывает permission denied и processing | Решить продуктовый вопрос об интерактивном seek; провести реальные сценарии записи, отмены, лимита и смены нескольких audio URI |
+| 6. Create Echo | 🟡 | Экран разделён на `create-echo/*`; добавлены typed drafts, validation, recoverable attachment errors, последовательный upload, AbortController, защита повторного submit, сохранение формы при ошибке; удалено лишнее media-library permission | Блокировать submit до валидности формы; добавить draft/attachment tests; вручную проверить image/audio/link, отмену upload и повторную отправку |
+| 7. Expo SDK 56 и `@expo/ui` | ⬜ | Не начато; UI-рефакторинг пока остаётся на React Native primitives, что изолирует SDK migration | Сначала закрыть текущий Android QA и расхождение native-конфигурации, затем обновить SDK отдельной серией изменений и внедрять `@expo/ui` точечно |
+
+### 0.1 Выполненные изменения по файлам
+
+- Дизайн-система: `mobile/src/theme/*`, `mobile/src/components/ui/*`.
+- Лента и карточки: `mobile/src/screens/HomeScreen.tsx`, `mobile/src/components/echo/echo-card.tsx`.
+- Рендер частей Echo: `mobile/src/components/echo/echo-part-renderer.tsx`.
+- Простые экраны: `LoginScreen.tsx`, `UserSettingsScreen.tsx`, `EchoDetailScreen.tsx`.
+- Медиа: `AudioPlayer.tsx`, `AudioRecorder.tsx`.
+- Создание Echo: `CreateEchoScreen.tsx`, `mobile/src/components/create-echo/*`.
+- Сеть создания/upload: `mobile/src/services/api.ts` принимает `AbortSignal`; multipart boundary оставлен формироваться `fetch` автоматически.
+- Разрешения: удалены дублирующиеся Android storage permissions и зависимость `expo-media-library`; photo/microphone descriptions уточнены.
+
+Текущий этап 6 находится в рабочем дереве и ещё не зафиксирован отдельным коммитом. Это относится к `CreateEchoScreen`, `components/create-echo`, `api.ts`, `app.json`, package manifests и очистке устаревшего `LocalEchoPart`.
+
+### 0.2 Последние подтверждённые проверки
+
+Проверено 13 августа 2026:
+
+```bash
+cd mobile
+npx tsc --noEmit             # пройдено
+npx expo config --type public # пройдено, SDK 53, Android package com.ikukuler.echoon
+cd ..
+git diff --check             # пройдено
+```
+
+Ранее Android bundle успешно собирался и исполнялся на подключённом физическом устройстве. Для старого установленного development client `com.ikukuler.echowave` потребовался USB port reverse; это временное окружение запуска, а не исправление native-конфигурации проекта.
+
+### 0.3 Следующий рабочий срез
+
+1. Завершить этап 6: вычисляемая валидность формы, disabled submit и тесты validation/attachments.
+2. Провести Android smoke test Create → upload → success и error/cancel flows; не использовать приватные пользовательские данные.
+3. Добавить недостающий `AppScreen` и перевести повторяющиеся корневые контейнеры без изменения поведения экранов.
+4. Добавить тесты UI-примитивов, `EchoCard` interactions и Home pagination guards.
+5. Закрыть ручную accessibility/large-text матрицу и сохранить безопасный визуальный baseline.
+6. Синхронизировать native Android package/scheme (`echowave` → `echoon`) через контролируемый rebuild development client.
+7. Только после чистого baseline начать отдельный этап обновления Expo SDK и `@expo/ui`.
+
 ## 1. Цель и ожидаемый результат
 
 Цель — превратить текущий набор стилизованных экранов в последовательную, доступную и поддерживаемую компонентную систему, сохранив узнаваемую тёплую визуальную эстетику EchoOn.
@@ -23,7 +77,7 @@
 - `@expo/ui` сейчас не установлен.
 - Навигация построена на React Navigation, а не Expo Router.
 - Стилизация построена на NativeWind 4 и токенах из `mobile/tailwind.config.js`.
-- Экран Home использует `ScrollView` и `echoes.map`, хотя данные загружаются постранично.
+- На старте работ экран Home использовал `ScrollView` и `echoes.map`; теперь он переведён на `FlatList` с защищённой пагинацией.
 - Изменения следует выполнять без переработки API backend и структуры `Echo`/`EchoPart`.
 
 ## 3. Требования и место реализации

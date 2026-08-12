@@ -135,10 +135,14 @@ class ApiService {
   }
 
   // Echoes
-  async createEcho(data: CreateEchoRequest): Promise<ApiResponse<Echo>> {
+  async createEcho(
+    data: CreateEchoRequest,
+    signal?: AbortSignal,
+  ): Promise<ApiResponse<Echo>> {
     return this.makeRequest<Echo>("/echoes", {
       method: "POST",
       body: JSON.stringify(data),
+      signal,
     });
   }
 
@@ -165,6 +169,7 @@ class ApiService {
     fileUri: string,
     fileName: string,
     fileType: string,
+    signal?: AbortSignal,
   ): Promise<ApiResponse<{ url: string }>> {
     try {
       const token = await authService.getToken();
@@ -178,15 +183,13 @@ class ApiService {
       } as any);
 
       const url = `${API_BASE_URL}/upload`;
-      console.log(`📤 Uploading file: ${fileName}`);
-
       const response = await fetch(url, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
         },
         body: formData,
+        signal,
       });
 
       const data = await response.json();

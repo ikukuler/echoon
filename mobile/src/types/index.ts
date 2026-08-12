@@ -41,15 +41,6 @@ export interface EchoPart {
   created_at: string;
 }
 
-// Extended EchoPart for local use (with file handling)
-export interface LocalEchoPart {
-  type: "text" | "image" | "audio" | "link";
-  content: string;
-  localUri?: string;
-  fileName?: string;
-  duration?: number;
-}
-
 export interface CreateEchoRequest {
   return_at?: string; // Опциональное поле - если не предоставлено, генерируется случайная дата
   parts: Array<{

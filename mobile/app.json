@@ -16,8 +16,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select images and audio files for your echoes.",
-        "NSMicrophoneUsageDescription": "This app needs access to your microphone to record audio for your echoes."
+        "NSPhotoLibraryUsageDescription": "EchoOn uses photo access only when you choose an image to attach to an echo.",
+        "NSMicrophoneUsageDescription": "EchoOn uses microphone access only while you record audio for an echo."
       },
       "bundleIdentifier": "com.ikukuler.echoon"
     },
@@ -26,12 +26,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": [
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
-      ],
       "package": "com.ikukuler.echoon",
       "googleServicesFile": "./google-services.json"
     },
